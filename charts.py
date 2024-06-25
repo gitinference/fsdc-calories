@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 
 
 def update_plate_charts():
+
+    print("Generating MyPlate charts")
+
     with open('nutrition_data/nutrient_distribution_yearly.json', 'r') as fp:
         nutrient_distribution_data: dict = json.load(fp)
 
@@ -23,8 +26,10 @@ def update_plate_charts():
 
         plt.legend(current_year_data.keys(), loc='upper left', bbox_to_anchor=(-0.15, 1.12), borderaxespad=0.)
 
-        plt.savefig(f"plate_graphs/{year}.png")
+        plt.savefig(f"charts/plate/{year}.png")
         plt.close()
+
+    print(f"Done, can be found at charts/plate/<year>.png)")
 
 
 if __name__ == '__main__':
