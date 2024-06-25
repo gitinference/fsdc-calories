@@ -24,9 +24,10 @@ dictConfig({
 })
 
 app = Flask(__name__)
+app.register_blueprint(routes)
 
 cron = BackgroundScheduler(daemon=True)
-cron.add_job(update_data, 'interval', seconds=5)
+# cron.add_job(update_data, 'interval', seconds=5)
 cron.start()
 
 atexit.register(lambda: cron.shutdown(wait=False))
