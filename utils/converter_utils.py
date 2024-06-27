@@ -3,6 +3,24 @@ import numpy as np
 from utils.constants import Constants
 
 
+def get_macronutrients():
+    return [
+        'calories',
+        'total_fat_g',
+        'protein_g',
+        'saturated_fat_g',
+        'cholesterol_mg',
+        'sodium_mg',
+        'carbohydrate_g',
+        'fiber_g',
+        'sugar_g',
+        'vitamin_d_iu',
+        'calcium_mg',
+        'potassium_mg',
+        'iron_mg'
+    ]
+
+
 class ConverterUtils:
 
     def __init__(self, filename: str):
@@ -26,10 +44,19 @@ class ConverterUtils:
 
         return code_to_category
 
+    def get_schedule_b_codes(self):
+        return self.data["schedule_b"].to_list()
+
+    def get_schedule_b_macronutrient_data(self, schedule_b_code: int):
+        index = self.data["schedule_b"] == schedule_b_code
+        data = self.data[index]
+
+        return {i: float(data[i].values[0]) for i in get_macronutrients()}
+
 
 def main():
-    utils = ConverterUtils('../schedule_b_reference.xlsx')
-    print(utils.schedule_b_to_category())
+    utils = ConverterUtils('data/schedule_b_reference.xlsx')
+    print(utils.get_schedule_b_macronutrient_data(701))
 
 
 if __name__ == '__main__':

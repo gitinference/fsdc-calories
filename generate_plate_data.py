@@ -4,10 +4,14 @@ from utils.constants import Constants
 import json
 
 
-def hts_processor():
+def generate_plate_data():
     print("Processing HTS data...")
 
-    hts_data = pd.read_csv('latest_hts.csv')
+    # Data paths
+    hts_data_path = 'data/raw_hts/latest_hts.csv'
+    schedule_b_reference_path = 'data/schedule_b_reference.xlsx'
+
+    hts_data = pd.read_csv(hts_data_path)
 
     # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
     def clean_hts_value(hts_value, figures=4):
@@ -15,7 +19,7 @@ def hts_processor():
 
     hts_data["HTS"] = hts_data["HTS"].apply(clean_hts_value)
 
-    utils = ConverterUtils('schedule_b_reference.xlsx')
+    utils = ConverterUtils(schedule_b_reference_path)
     code_to_category = utils.schedule_b_to_category()
 
     nutrient_distribution_yearly = {}
@@ -34,11 +38,12 @@ def hts_processor():
 
         nutrient_distribution_yearly[year] = plate_distribution
 
-    with open('nutrition_data/nutrient_distribution_yearly.json', 'w') as fp:
-        json.dump(nutrient_distribution_yearly, fp)
+    plate_data_out = 'data/plate/nutrient_distribution_yearly.json'
+    with open(plate_data_out, 'w') as f:
+        json.dump(nutrient_distribution_yearly, f, indent=4)
 
-    print('Done, extracted data is available in nutrition_data/plate_distribution.json')
+    print(f'Done, extracted data is available in {plate_data_out}')
 
 
 if __name__ == '__main__':
-    hts_processor()
+    generate_plate_data()

@@ -13,12 +13,12 @@ def download_latest_hts():
     print("Downloading latest HTS data...")
 
     # Set up ChromeDriver and options
-    download_dir = os.getcwd()
+    download_dir = os.path.join(os.getcwd(), "data\\raw_hts")
     chrome_options = webdriver.ChromeOptions()
     chromedriver_binary_path = "chromedriver-win64/chromedriver.exe"
     prefs = {'download.default_directory': download_dir}
     chrome_options.add_experimental_option('prefs', prefs)
-    chrome_options.add_argument('--headless=new')
+    # chrome_options.add_argument('--headless=new')
     driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
     print("Web driver ready, opening...")
 
@@ -77,7 +77,7 @@ def download_latest_hts():
         print(f"Download completed: {files[0]}")
         downloaded_filename = files[0]
     else:
-        print(f"Download did not complete in the expected time.")
+        print(f"Download did not complete in the expected time")
 
     # Close the browser
     driver.quit()
@@ -85,11 +85,13 @@ def download_latest_hts():
     if downloaded_filename:
         # Check if latest_hts exists
         if os.path.exists(os.path.join(download_dir, "latest_hts.csv")):
-            print(f"Latest HTS file already exists, moving to back-up folder")
+            print(f"Newer HTS file downloaded, moving current to backup folder")
+
             # Move latest to back-up folder and append current date
             old_filename = os.path.join(download_dir, "latest_hts.csv")
             new_filename = os.path.join(download_dir, "hts_backups",
                                         f"{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv")
             os.rename(old_filename, new_filename)
 
+        # Rename downloaded file to "latest_hts.csv"
         os.rename(os.path.join(download_dir, downloaded_filename), os.path.join(download_dir, 'latest_hts.csv'))

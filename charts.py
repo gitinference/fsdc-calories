@@ -3,15 +3,17 @@ import json
 import matplotlib.pyplot as plt
 
 
-def update_plate_charts():
+def main():
+    pass
 
+
+def update_plate_charts():
     print("Generating MyPlate charts")
 
-    with open('nutrition_data/nutrient_distribution_yearly.json', 'r') as fp:
+    with open('data/plate/nutrient_distribution_yearly.json', 'r') as fp:
         nutrient_distribution_data: dict = json.load(fp)
 
     for year in nutrient_distribution_data:
-
         current_year_data = nutrient_distribution_data[year]
 
         # Create a pie chart
@@ -32,5 +34,13 @@ def update_plate_charts():
     print(f"Done, can be found at charts/plate/<year>.png)")
 
 
+def update_timeseries_charts():
+    pass
+
+
+def generate_custom_timeseries_chart(start_year, end_year, macronutrient):
+    pass
+
+
 if __name__ == '__main__':
-    update_plate_charts()
+    main()
