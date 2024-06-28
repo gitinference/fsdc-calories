@@ -24,7 +24,8 @@ def generate_plate_data():
 
     nutrient_distribution_yearly = {}
 
-    for year in range(2002, 2025):
+    min_year, max_year = hts_data["year"].min(), hts_data["year"].max()
+    for year in range(min_year, max_year + 1):
         print("Processing year {}".format(year))
         plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
         data_current_year = hts_data[hts_data["year"] == year]
@@ -37,6 +38,12 @@ def generate_plate_data():
         plate_distribution.pop("ice_cream")
 
         nutrient_distribution_yearly[year] = plate_distribution
+
+    # Add latest month for newest data
+    latest_month = hts_data[hts_data["year"] == max_year]["month"].max()
+    nutrient_distribution_yearly["latest_year_extra"] = {
+        "latest_month": int(latest_month)
+    }
 
     plate_data_out = 'data/plate/nutrient_distribution_yearly.json'
     with open(plate_data_out, 'w') as f:
