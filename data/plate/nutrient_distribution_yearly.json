@@ -1,232 +1,235 @@
 {
     "2002": {
-        "protein": 728,
-        "sugars": 385,
-        "fats": 150,
-        "dairy": 165,
-        "fruits": 462,
         "vegetable": 664,
+        "dairy": 165,
+        "protein": 728,
         "grains": 750,
-        "other": 808
+        "sugars": 385,
+        "fruits": 462,
+        "other": 808,
+        "fats": 150
     },
     "2003": {
-        "protein": 1365,
-        "sugars": 750,
-        "fats": 301,
-        "dairy": 289,
-        "fruits": 842,
         "vegetable": 1325,
+        "dairy": 289,
+        "protein": 1365,
         "grains": 1469,
-        "other": 1615
+        "sugars": 750,
+        "fruits": 842,
+        "other": 1615,
+        "fats": 301
     },
     "2004": {
-        "protein": 1393,
-        "sugars": 661,
-        "fats": 331,
-        "dairy": 295,
-        "fruits": 845,
         "vegetable": 1449,
+        "dairy": 295,
+        "protein": 1393,
         "grains": 1517,
-        "other": 1696
+        "sugars": 661,
+        "fruits": 845,
+        "other": 1696,
+        "fats": 331
     },
     "2005": {
-        "protein": 1666,
-        "sugars": 660,
-        "fats": 373,
-        "dairy": 318,
-        "fruits": 1038,
         "vegetable": 1529,
+        "dairy": 318,
+        "protein": 1666,
         "grains": 1554,
-        "other": 1754
+        "sugars": 660,
+        "fruits": 1038,
+        "other": 1754,
+        "fats": 373
     },
     "2006": {
-        "protein": 1783,
-        "sugars": 729,
-        "fats": 391,
-        "dairy": 311,
-        "fruits": 1126,
         "vegetable": 1558,
+        "dairy": 311,
+        "protein": 1783,
         "grains": 1516,
-        "other": 1818
+        "sugars": 729,
+        "fruits": 1126,
+        "other": 1818,
+        "fats": 391
     },
     "2007": {
-        "protein": 1794,
-        "sugars": 750,
-        "fats": 392,
-        "dairy": 298,
-        "fruits": 1130,
         "vegetable": 1620,
+        "dairy": 298,
+        "protein": 1794,
         "grains": 1602,
-        "other": 1909
+        "sugars": 750,
+        "fruits": 1130,
+        "other": 1909,
+        "fats": 392
     },
     "2008": {
-        "protein": 1941,
-        "sugars": 722,
-        "fats": 414,
-        "dairy": 320,
-        "fruits": 1083,
         "vegetable": 1572,
+        "dairy": 320,
+        "protein": 1941,
         "grains": 1671,
-        "other": 1895
+        "sugars": 722,
+        "fruits": 1083,
+        "other": 1895,
+        "fats": 414
     },
     "2009": {
-        "protein": 1954,
-        "sugars": 757,
-        "fats": 405,
-        "dairy": 317,
-        "fruits": 1167,
         "vegetable": 1610,
+        "dairy": 317,
+        "protein": 1954,
         "grains": 1746,
-        "other": 1934
+        "sugars": 757,
+        "fruits": 1167,
+        "other": 1934,
+        "fats": 405
     },
     "2010": {
-        "protein": 1897,
-        "sugars": 744,
-        "fats": 388,
-        "dairy": 348,
-        "fruits": 1114,
         "vegetable": 1600,
+        "dairy": 348,
+        "protein": 1897,
         "grains": 1614,
-        "other": 1957
+        "sugars": 744,
+        "fruits": 1114,
+        "other": 1957,
+        "fats": 388
     },
     "2011": {
-        "protein": 1823,
-        "sugars": 744,
-        "fats": 372,
-        "dairy": 340,
-        "fruits": 1120,
         "vegetable": 1658,
+        "dairy": 340,
+        "protein": 1823,
         "grains": 1631,
-        "other": 1962
+        "sugars": 744,
+        "fruits": 1120,
+        "other": 1962,
+        "fats": 372
     },
     "2012": {
-        "protein": 2055,
-        "sugars": 730,
-        "fats": 374,
-        "dairy": 360,
-        "fruits": 1060,
         "vegetable": 1615,
+        "dairy": 360,
+        "protein": 2055,
         "grains": 1640,
-        "other": 2048
+        "sugars": 730,
+        "fruits": 1060,
+        "other": 2048,
+        "fats": 374
     },
     "2013": {
-        "protein": 1974,
-        "sugars": 729,
-        "fats": 389,
-        "dairy": 358,
-        "fruits": 1077,
         "vegetable": 1670,
+        "dairy": 358,
+        "protein": 1974,
         "grains": 1638,
-        "other": 2076
+        "sugars": 729,
+        "fruits": 1077,
+        "other": 2076,
+        "fats": 389
     },
     "2014": {
-        "protein": 1945,
-        "sugars": 731,
-        "fats": 427,
-        "dairy": 372,
-        "fruits": 1225,
         "vegetable": 1720,
+        "dairy": 372,
+        "protein": 1945,
         "grains": 1662,
-        "other": 2094
+        "sugars": 731,
+        "fruits": 1225,
+        "other": 2094,
+        "fats": 427
     },
     "2015": {
-        "protein": 2101,
-        "sugars": 757,
-        "fats": 465,
-        "dairy": 358,
-        "fruits": 1340,
         "vegetable": 1721,
+        "dairy": 358,
+        "protein": 2101,
         "grains": 1742,
-        "other": 2216
+        "sugars": 757,
+        "fruits": 1340,
+        "other": 2216,
+        "fats": 465
     },
     "2016": {
-        "protein": 2080,
-        "sugars": 741,
-        "fats": 508,
-        "dairy": 354,
-        "fruits": 1362,
         "vegetable": 1712,
+        "dairy": 354,
+        "protein": 2080,
         "grains": 1741,
-        "other": 2217
+        "sugars": 741,
+        "fruits": 1362,
+        "other": 2217,
+        "fats": 508
     },
     "2017": {
-        "protein": 2027,
-        "sugars": 756,
-        "fats": 478,
-        "dairy": 360,
-        "fruits": 1358,
         "vegetable": 1701,
+        "dairy": 360,
+        "protein": 2027,
         "grains": 1743,
-        "other": 2240
+        "sugars": 756,
+        "fruits": 1358,
+        "other": 2240,
+        "fats": 478
     },
     "2018": {
-        "protein": 2173,
-        "sugars": 816,
-        "fats": 504,
-        "dairy": 367,
-        "fruits": 1500,
         "vegetable": 1761,
+        "dairy": 367,
+        "protein": 2173,
         "grains": 1738,
-        "other": 2316
+        "sugars": 816,
+        "fruits": 1500,
+        "other": 2316,
+        "fats": 504
     },
     "2019": {
-        "protein": 2178,
-        "sugars": 775,
-        "fats": 499,
-        "dairy": 363,
-        "fruits": 1419,
         "vegetable": 1774,
+        "dairy": 363,
+        "protein": 2178,
         "grains": 1781,
-        "other": 2338
+        "sugars": 775,
+        "fruits": 1419,
+        "other": 2338,
+        "fats": 499
     },
     "2020": {
-        "protein": 2130,
-        "sugars": 782,
-        "fats": 491,
-        "dairy": 350,
-        "fruits": 1460,
         "vegetable": 1819,
+        "dairy": 350,
+        "protein": 2130,
         "grains": 1854,
-        "other": 2363
+        "sugars": 782,
+        "fruits": 1460,
+        "other": 2363,
+        "fats": 491
     },
     "2021": {
-        "protein": 2385,
-        "sugars": 803,
-        "fats": 510,
-        "dairy": 371,
-        "fruits": 1423,
         "vegetable": 1841,
+        "dairy": 371,
+        "protein": 2385,
         "grains": 1811,
-        "other": 2441
+        "sugars": 803,
+        "fruits": 1423,
+        "other": 2441,
+        "fats": 510
     },
     "2022": {
-        "protein": 2246,
-        "sugars": 777,
-        "fats": 478,
-        "dairy": 370,
-        "fruits": 1494,
         "vegetable": 1902,
+        "dairy": 370,
+        "protein": 2246,
         "grains": 1795,
-        "other": 2344
+        "sugars": 777,
+        "fruits": 1494,
+        "other": 2344,
+        "fats": 478
     },
     "2023": {
-        "protein": 2290,
-        "sugars": 816,
-        "fats": 495,
-        "dairy": 356,
-        "fruits": 1565,
         "vegetable": 1872,
+        "dairy": 356,
+        "protein": 2290,
         "grains": 1823,
-        "other": 2403
+        "sugars": 816,
+        "fruits": 1565,
+        "other": 2403,
+        "fats": 495
     },
     "2024": {
-        "protein": 794,
-        "sugars": 275,
-        "fats": 168,
-        "dairy": 124,
-        "fruits": 526,
         "vegetable": 613,
+        "dairy": 124,
+        "protein": 794,
         "grains": 621,
-        "other": 776
+        "sugars": 275,
+        "fruits": 526,
+        "other": 776,
+        "fats": 168
+    },
+    "latest_year_extra": {
+        "latest_month": 4
     }
 }
