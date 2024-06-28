@@ -13,6 +13,12 @@ def update_plate_charts():
     with open('data/plate/nutrient_distribution_yearly.json', 'r') as fp:
         nutrient_distribution_data: dict = json.load(fp)
 
+    latest_month = nutrient_distribution_data["latest_year_extra"]["latest_month"]
+    nutrient_distribution_data.pop("latest_year_extra")
+
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+
     for year in nutrient_distribution_data:
         current_year_data = nutrient_distribution_data[year]
 
@@ -24,8 +30,12 @@ def update_plate_charts():
         ax.axis('equal')
 
         # Title of the pie chart
-        plt.title(f"Nutrient Distribution for {year}")
+        title = f"Nutrient Distribution for {year}"
+        if year == max(nutrient_distribution_data):
+            # Pop latest month from JSON data
+            title += f" (as of {months[latest_month - 1]})"
 
+        plt.title(title)
         plt.legend(current_year_data.keys(), loc='upper left', bbox_to_anchor=(-0.15, 1.12), borderaxespad=0.)
 
         plt.savefig(f"charts/plate/{year}.png")
