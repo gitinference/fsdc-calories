@@ -1,6 +1,9 @@
 import json
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import pandas as pd
+import io
 
 
 def main():
@@ -44,12 +47,57 @@ def update_plate_charts():
     print(f"Done, can be found at charts/plate/<year>.png)")
 
 
-def update_timeseries_charts():
-    pass
+def generate_timeseries_chart(tseries_start, tseries_end, macronutrient):
+    with open('data/macronutrients/hts_macronutrients_data.csv', 'r') as f:
+        df = pd.read_csv(f)
 
+    fig, ax = plt.subplots()
 
-def generate_custom_timeseries_chart(start_year, end_year, macronutrient):
-    pass
+    data = {}
+    for year in range(tseries_start, tseries_end + 1):
+        yearly = df[df["year"] == year]
+        start, end = 1, 3
+        trimester = 1
+        while trimester <= 4:
+            trimester_sum = yearly[(yearly["month"] >= start) & (yearly["month"] <= end)][macronutrient].sum()
+            data[f"{year}-T{trimester}"] = trimester_sum
+            start += 3
+            end += 3
+            trimester += 1
+
+    x_axis = list(data.keys())
+    y_axis = [x / 1_000_000 for x in data.values()]
+    for y in data:
+        print(y, data[y])
+    try:
+        assert len(x_axis) == len(y_axis)
+    except AssertionError:
+        print("Length of x_axis and y_axis do not match")
+
+    ax.plot(x_axis, y_axis, '--bo')
+    ax.set_xticks(x_axis)
+    ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+
+    plt.ylabel(f"{macronutrient} (in millions)")
+    plt.xlabel("timeperiod (<year>-T<trimester>)")
+    plt.title(f"{macronutrient} from {tseries_start} to {tseries_end}")
+
+    def set_size(w, h):
+        """ w, h: width, height in inches """
+        ax = plt.gca()
+        left = ax.figure.subplotpars.left
+        right = ax.figure.subplotpars.right
+        top = ax.figure.subplotpars.top
+        bottom = ax.figure.subplotpars.bottom
+        figw = float(w) / (right - left)
+        figh = float(h) / (top - bottom)
+        ax.figure.set_size_inches(figw, figh)
+
+    set_size(10, 6)
+    f = io.BytesIO()
+    plt.savefig(f, format='png')
+
+    return f
 
 
 if __name__ == '__main__':
