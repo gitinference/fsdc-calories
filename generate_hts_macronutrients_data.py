@@ -4,7 +4,7 @@ from utils.converter_utils import ConverterUtils, get_macronutrients
 
 
 def main():
-    df = pd.read_csv("data/macronutrients/hts_with_macronutrient_data.csv")
+    df = pd.read_csv("data/macronutrients/hts_macronutrients_data.csv")
 
     # min_year, max_year = df["year"].min(), df["year"].max()
     # yearly_calories = {
@@ -45,7 +45,7 @@ def generate_hts_macronutrients_data():
     }
 
     # Generate new dataframe with code, year, unit and quantity
-    filtered_codes = filtered_codes[["HTS", "year", "unit_1", "qty_1"]]
+    filtered_codes = filtered_codes[["HTS", "year", "month", "unit_1", "qty_1"]]
 
     # Normalize all units to use uppercase
     filtered_codes["unit_1"] = filtered_codes["unit_1"].apply(lambda val: val.upper())
