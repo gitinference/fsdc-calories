@@ -15,7 +15,7 @@ def main():
 
 
 def generate_hts_macronutrients_data():
-    hts_data_path = 'data/raw_hts/latest_hts.csv.csv'
+    hts_data_path = 'data/raw_hts/latest_hts.csv'
     hts_data = pd.read_csv(hts_data_path)
 
     # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
