@@ -8,7 +8,7 @@ def generate_plate_data():
     print("Processing HTS data...")
 
     # Data paths
-    hts_data_path = 'data/raw_hts/latest_hts.csv'
+    hts_data_path = 'data/raw_hts/imports/latest_hts_imports.csv'
     schedule_b_reference_path = 'data/schedule_b_reference.xlsx'
 
     hts_data = pd.read_csv(hts_data_path)
