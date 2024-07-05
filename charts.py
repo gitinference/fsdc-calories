@@ -60,7 +60,7 @@ def generate_timeseries_chart(tseries_start, tseries_end, macronutrient):
         trimester = 1
         while trimester <= 4:
             trimester_sum = yearly[(yearly["month"] >= start) & (yearly["month"] <= end)][macronutrient].sum()
-            data[f"{year}-T{trimester}"] = trimester_sum
+            data[f"{year % 100}-T{trimester}"] = trimester_sum
             start += 3
             end += 3
             trimester += 1
@@ -79,7 +79,7 @@ def generate_timeseries_chart(tseries_start, tseries_end, macronutrient):
     ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
     plt.ylabel(f"{macronutrient} (in millions)")
-    plt.xlabel("timeperiod (<year>-T<trimester>)")
+    plt.xlabel("timeperiod (YY-T<trimester>)")
     plt.title(f"{macronutrient} from {tseries_start} to {tseries_end}")
 
     def set_size(w, h):
