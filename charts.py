@@ -75,7 +75,8 @@ def generate_timeseries_chart(tseries_start, tseries_end, macronutrient):
         print("Length of x_axis and y_axis do not match")
 
     ax.plot(x_axis, y_axis, '--bo')
-    ax.set_xticks(x_axis)
+    x_ticks = x_axis[1::2] if tseries_end - tseries_start > 3 else x_axis
+    ax.set_xticks(x_ticks)
     ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
     plt.ylabel(f"{macronutrient} (in millions)")
