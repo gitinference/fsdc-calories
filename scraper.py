@@ -46,7 +46,7 @@ def download_latest_hts_imports():
 
     # Select option "Importaciones"
     print("Setting mode to import...")
-    import_option_id = 'dnn_ctr244936_import_export_htmltables_rbl_IE_1'  # ID CAN CHANGE DEPENDING ON UPDATES TO THE SITE
+    import_option_id = 'dnn_ctr244936_import_export_htmltables_rbl_IE_1'  # ID CAN CHANGE DEPENDING ON SITE UPDATES
     import_select = wait.until(ec.presence_of_element_located((By.ID, import_option_id)))
     import_select.click()
     print("Done.")
@@ -134,7 +134,7 @@ def download_latest_hts_exports():
 
     # Select option "Exportaciones"
     print("Setting mode to export...")
-    import_option_id = 'dnn_ctr244936_import_export_htmltables_rbl_IE_0'  # ID CAN CHANGE DEPENDING ON UPDATES TO THE SITE
+    import_option_id = 'dnn_ctr244936_import_export_htmltables_rbl_IE_0'  # ID CAN CHANGE DEPENDING SITE UPDATES
     import_select = wait.until(ec.presence_of_element_located((By.ID, import_option_id)))
     import_select.click()
     print("Done.")
