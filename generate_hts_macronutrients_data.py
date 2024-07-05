@@ -1,5 +1,4 @@
 import pandas as pd
-import matplotlib.pyplot as plt
 from utils.converter_utils import ConverterUtils, get_macronutrients
 
 
