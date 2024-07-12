@@ -1,8 +1,13 @@
-from flask import Blueprint, jsonify, send_file, abort, current_app, request, json
+from flask import Blueprint, jsonify, send_file, abort, current_app, request, json, render_template
 from werkzeug.security import safe_join
 from charts import generate_timeseries_chart
 
 routes = Blueprint('my_routes', __name__)
+
+
+@routes.route('/')
+def home():
+    return render_template('index.html')
 
 
 @routes.route('/nutrient_distribution', methods=['GET'])
@@ -17,7 +22,6 @@ def nutrient_distribution():
 
 @routes.route('/get_timeseries_chart', methods=['GET'])
 def get_timeseries_chart():
-
     tseries_start = int(request.args.get('start_year'))
     tseries_end = int(request.args.get('end_year'))
     macronutrient = request.args.get('macronutrient')
