@@ -3,18 +3,10 @@ from utils.converter_utils import ConverterUtils, get_macronutrients
 
 
 def main():
-    df = pd.read_csv("data/macronutrients/hts_macronutrients_data.csv")
-
-    # min_year, max_year = df["year"].min(), df["year"].max()
-    # yearly_calories = {
-    #     year: df[df["year"] == year]["calories"].sum() for year in range(min_year, max_year + 1)
-    # }
-
-    print(df.groupby("year").head())
+    pass
 
 
-def generate_hts_macronutrients_data():
-    hts_data_path = 'data/raw_hts/imports/latest_hts_imports.csv'
+def generate_hts_macronutrients_data(hts_data_path):
     hts_data = pd.read_csv(hts_data_path)
 
     # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
@@ -31,6 +23,10 @@ def generate_hts_macronutrients_data():
     # Drop rows with no value in unit_1 (invalid)
     invalid_rows = filtered_codes[filtered_codes["unit_1"].apply(lambda x: not isinstance(x, str))]
     filtered_codes = filtered_codes.drop(invalid_rows.index)
+
+    # Set mode if reading import or export data
+    mode = "import" if hts_data.head(1)["import_export"].values[0] == "i" else "export"
+    print("Current mode: ", mode)
 
     unit_to_kg_factor = {
         'L': 1,
@@ -66,11 +62,16 @@ def generate_hts_macronutrients_data():
     # Clean up empty cells with 0
     filtered_codes.fillna(0, inplace=True)
 
-    macronutrients_data_out = 'data/macronutrients/hts_macronutrients_data.csv'
+    macronutrients_data_out = f'data/macronutrients/hts_macronutrients_data_{mode}.csv'
     filtered_codes.to_csv(macronutrients_data_out, index=False)
 
     print(f"Done, data written to {macronutrients_data_out}")
 
 
+def generate_net_macronutrients_data(import_datapath, export_datapath):
+    pass
+
+
 if __name__ == '__main__':
-    generate_hts_macronutrients_data()
+    generate_hts_macronutrients_data('data/raw_hts/imports/latest_hts_imports.csv')
+    generate_hts_macronutrients_data('data/raw_hts/exports/latest_hts_exports.csv')
