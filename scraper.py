@@ -99,8 +99,7 @@ def download_latest_hts_imports():
             if os.path.exists(os.path.join(download_dir, "backups")):
                 os.mkdir(os.path.join(download_dir, "backups"))
 
-            new_filename = os.path.join(download_dir, "backups",
-                                        f"{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv")
+            new_filename = os.path.join(download_dir, "backups", f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv")
             os.rename(old_filename, new_filename)
 
         # Rename downloaded file to "latest_hts.csv"
