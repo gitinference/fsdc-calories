@@ -186,8 +186,7 @@ def download_latest_hts_exports():
 
             # Move latest to back-up folder and append current date
             old_filename = os.path.join(download_dir, "latest_hts_exports.csv")
-            new_filename = os.path.join(download_dir, "backups",
-                                        f"{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv")
+            new_filename = os.path.join(download_dir, "backups", f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv")
             os.rename(old_filename, new_filename)
 
         # Rename downloaded file to "latest_hts.csv"
