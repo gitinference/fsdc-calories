@@ -1,25 +1,17 @@
-from flask import Blueprint, jsonify, send_file, abort, current_app, request
+from flask import Blueprint, jsonify, send_file, abort, current_app, request, json
 from werkzeug.security import safe_join
 from charts import generate_timeseries_chart
 
 routes = Blueprint('my_routes', __name__)
 
 
-@routes.route('/nutrient_distribution/<year>', methods=['GET'])
-def nutrient_distribution(year):
-
-    current_app.logger.info(f'nutrient distribution for {year}')
-
-    # Define the directory containing the files
-    directory = 'charts/plate'
-
+@routes.route('/nutrient_distribution', methods=['GET'])
+def nutrient_distribution():
     try:
-        # Securely join the directory and filename
-        file_path = safe_join(directory, str(year) + ".png")
-
-        # Send the file to the client
-        return send_file(file_path, as_attachment=True)
+        data = json.load(open('data/plate/nutrient_distribution_yearly.json', 'r'))
+        return jsonify(data)
     except FileNotFoundError:
+        current_app.logger.error('Nutrient data not found')
         abort(404)  # Return a 404 error if the file is not found
 
 

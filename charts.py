@@ -10,6 +10,15 @@ def main():
     pass
 
 
+"""
+This method reads plate data and generates charts. Saves all plots to a directory.
+NOTE: UNUSED, DEPRECATED
+This was used to generate the chart images and a Flask route would 
+send the file. This route now sends the raw data and offloads the 
+chart generation to the client (can be observed in routes/routes.py).
+"""
+
+
 def update_plate_charts():
     print("Generating MyPlate charts")
 
