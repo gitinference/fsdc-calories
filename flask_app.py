@@ -28,11 +28,11 @@ app = Flask(__name__)
 app.register_blueprint(routes)
 # CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:5500"}})
 
-cron = BackgroundScheduler(daemon=True)
+# cron = BackgroundScheduler(daemon=True)
 # cron.add_job(update_data, 'interval', seconds=5)
-cron.start()
+# cron.start()
 
-atexit.register(lambda: cron.shutdown(wait=False))
+# atexit.register(lambda: cron.shutdown(wait=False))
 
 if __name__ == '__main__':
     app.run()
