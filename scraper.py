@@ -26,7 +26,7 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
     chromedriver_binary_path = "chromedriver-win64/chromedriver.exe"
     prefs = {'download.default_directory': download_dir}
     chrome_options.add_experimental_option('prefs', prefs)
-    # chrome_options.add_argument('--headless=new')
+    chrome_options.add_argument('--headless=new')
     driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
     print("Web driver ready, opening...")
 
