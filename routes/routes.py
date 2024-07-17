@@ -13,14 +13,15 @@ def home():
 
 @routes.route('/nutrient_distribution', methods=['GET'])
 def nutrient_distribution():
+    current_dir = Path(__file__).parent.resolve()
+    fp = current_dir / ".." / "data/plate/nutrient_distribution_yearly.json"
     try:
-        current_dir = Path(__file__).parent.resolve()
-        fp = current_dir / "data/plate/nutrient_distribution_yearly.json"
         with open(fp, 'r') as f:
             data = json.load(f)
             return jsonify(data)
     except FileNotFoundError:
         current_app.logger.error('Nutrient data not found')
+        current_app.logger.error(str(Path(fp).resolve()))
         abort(404)  # Return a 404 error if the file is not found
 
 
