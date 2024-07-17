@@ -26,7 +26,12 @@ from logging.config import dictConfig
 
 app = Flask(__name__)
 app.register_blueprint(routes)
-# CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:5500"}})
+CORS(app, resources={r"/*": {
+    "origins": [
+        "http://127.0.0.1:5500",
+        "https://www.uprm.edu"
+    ]
+}})
 
 # cron = BackgroundScheduler(daemon=True)
 # cron.add_job(update_data, 'interval', seconds=5)
