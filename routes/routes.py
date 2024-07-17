@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, send_file, abort, current_app, request, json, render_template
+from pathlib import Path
 from werkzeug.security import safe_join
 from charts import generate_timeseries_chart
 
@@ -13,7 +14,9 @@ def home():
 @routes.route('/nutrient_distribution', methods=['GET'])
 def nutrient_distribution():
     try:
-        with open('data/plate/nutrient_distribution_yearly.json', 'r') as f:
+        current_dir = Path(__file__).parent.resolve()
+        fp = current_dir / "data/plate/nutrient_distribution_yearly.json"
+        with open(fp, 'r') as f:
             data = json.load(f)
             return jsonify(data)
     except FileNotFoundError:
