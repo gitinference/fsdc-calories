@@ -11,7 +11,8 @@ import os
 import time
 
 """
-This file scrapes the government website and downloads import and export data. 
+This file scrapes the government website and downloads import and export data.
+Method returns a tuple of Pandas DataFrames.
 """
 
 
@@ -104,8 +105,10 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
         import_data = pd.read_csv(os.path.join(tmp_dir.name, downloaded_files[0]))
         export_data = pd.read_csv(os.path.join(tmp_dir.name, downloaded_files[1]))
     else:
+        tmp_dir.cleanup()
         raise Exception("No downloaded files")
 
+    tmp_dir.cleanup()
     return import_data, export_data
 
 
