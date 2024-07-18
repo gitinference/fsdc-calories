@@ -44,19 +44,28 @@ class ConverterUtils:
 
         return code_to_category
 
-    def get_schedule_b_codes(self):
+    def get_valid_schedule_b_codes(self):
         return self.data["schedule_b"].to_list()
 
     def get_schedule_b_macronutrient_data(self, schedule_b_code: int):
         index = self.data["schedule_b"] == schedule_b_code
         data = self.data[index]
 
-        return {i: float(data[i].values[0]) for i in get_macronutrients()}
+        return {
+            i: float(data[i].values[0]) for i in get_macronutrients()
+        }
+
+    def get_schedule_b_macronutrient_data_list(self, schedule_b_code_list: list[int]):
+        # Returns a dictionary with each code and the associated macronutrient data
+        return {
+            code: self.get_schedule_b_macronutrient_data(code) for code in schedule_b_code_list
+        }
 
 
 def main():
-    utils = ConverterUtils('data/schedule_b_reference.xlsx')
-    print(utils.get_schedule_b_macronutrient_data(701))
+    utils = ConverterUtils('../data/schedule_b_reference.xlsx')
+    # print(utils.get_schedule_b_macronutrient_data(701))
+    print(utils.get_schedule_b_macronutrient_data_list([307, 2209]))
 
 
 if __name__ == '__main__':
