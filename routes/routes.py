@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, send_file, abort, current_app, request, js
 from pathlib import Path
 from werkzeug.security import safe_join
 from charts import generate_timeseries_chart
+from process_fiscal_data import get_country_list, get_net_value_country
 
 routes = Blueprint('my_routes', __name__)
 
@@ -41,3 +42,15 @@ def get_timeseries_chart():
     # TODO Refactor to offload graph generation to frontend
     plot = generate_timeseries_chart(tseries_start, tseries_end, macronutrient)
     return send_file(plot, mimetype='image/png', as_attachment=True, download_name='timeseries_chart.png')
+
+
+@routes.route('/get_fiscal_data_country', methods=['GET'])
+def get_fiscal_data_country():
+    country = request.args.get('country', default="United States", type=str)
+
+    try:
+        data = get_net_value_country(country)
+    except KeyError as err:
+        return jsonify({'error': str(err)}), 400
+
+    return jsonify(data)
