@@ -9,6 +9,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.chrome.service import Service
 import os
 import time
+import platform
 
 """
 This file scrapes the government website and downloads import and export data.
@@ -17,13 +18,23 @@ Method returns a tuple of Pandas DataFrames.
 
 
 def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
+    # Set up chromedriver path depending on platform
+    current_dir = Path(__file__).parent.absolute()
+    current_system = platform.system()
+
+    if current_system == 'Linux':
+        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-linux64" / "chromedriver")
+    elif current_system == 'Windows':
+        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-win64" / "chromedriver.exe")
+    else:
+        raise OSError(f"Unsupported OS: {current_system}")
+
     # Set up temporary directory for HTS data
     tmp_dir = TemporaryDirectory()
 
     # Set up ChromeDriver and options
     download_dir = tmp_dir.name
     chrome_options = webdriver.ChromeOptions()
-    chromedriver_binary_path = "chromedriver-win64/chromedriver.exe"
     prefs = {'download.default_directory': download_dir}
     chrome_options.add_experimental_option('prefs', prefs)
     chrome_options.add_argument('--headless=new')
