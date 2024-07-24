@@ -54,3 +54,8 @@ def get_fiscal_data_country():
         return jsonify({'error': str(err)}), 400
 
     return jsonify(data)
+
+
+@routes.route('/get_fiscal_country_list', methods=['GET'])
+def get_fiscal_country_list():
+    return jsonify(get_country_list())
