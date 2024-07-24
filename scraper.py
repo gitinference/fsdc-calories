@@ -18,27 +18,29 @@ Method returns a tuple of Pandas DataFrames.
 
 
 def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
-    # Set up chromedriver path depending on platform
-    current_dir = Path(__file__).parent.absolute()
-    current_system = platform.system()
-
-    if current_system == 'Linux':
-        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-linux64" / "chromedriver")
-    elif current_system == 'Windows':
-        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-win64" / "chromedriver.exe")
-    else:
-        raise OSError(f"Unsupported OS: {current_system}")
 
     # Set up temporary directory for HTS data
     tmp_dir = TemporaryDirectory()
 
-    # Set up ChromeDriver and options
+    # Set up ChromeOptions
     download_dir = tmp_dir.name
     chrome_options = webdriver.ChromeOptions()
     prefs = {'download.default_directory': download_dir}
     chrome_options.add_experimental_option('prefs', prefs)
     chrome_options.add_argument('--headless=new')
-    driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
+
+    # Set up chromedriver depending on platform
+    current_dir = Path(__file__).parent.absolute()
+    current_system = platform.system()
+
+    if current_system == 'Linux':
+        driver = webdriver.Chrome(options=chrome_options)
+    elif current_system == 'Windows':
+        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-win64" / "chromedriver.exe")
+        driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
+    else:
+        raise OSError(f"Unsupported OS: {current_system}")
+
     print("Web driver ready, opening...")
 
     # URL of the target website
