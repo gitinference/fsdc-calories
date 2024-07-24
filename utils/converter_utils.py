@@ -45,7 +45,7 @@ class ConverterUtils:
         return code_to_category
 
     def get_valid_schedule_b_codes(self):
-        return self.data["schedule_b"].to_list()
+        return [int(code) for code in self.data["schedule_b"].to_list()]
 
     def get_schedule_b_macronutrient_data(self, schedule_b_code: int):
         index = self.data["schedule_b"] == schedule_b_code
