@@ -4,14 +4,12 @@ from utils.constants import Constants
 import json
 
 
-def generate_plate_data():
+def generate_plate_data(hts_dataframe: pd.DataFrame):
     print("Processing HTS data...")
 
     # Data paths
-    hts_data_path = 'data/raw_hts/imports/latest_hts_imports.csv'
     schedule_b_reference_path = 'data/schedule_b_reference.xlsx'
-
-    hts_data = pd.read_csv(hts_data_path)
+    hts_data = hts_dataframe
 
     # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
     def clean_hts_value(hts_value, figures=4):
@@ -53,4 +51,4 @@ def generate_plate_data():
 
 
 if __name__ == '__main__':
-    generate_plate_data()
+    pass
