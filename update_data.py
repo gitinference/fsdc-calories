@@ -1,11 +1,12 @@
-from scraper import download_latest_hts_imports, download_latest_hts_exports
+from scraper import get_hts_dataframe
 from generate_plate_data import generate_plate_data
+from generate_hts_macronutrients_data import generate_net_macronutrients_data
 
 
 def update_data():
-    download_latest_hts_imports()
-    download_latest_hts_exports()
-    generate_plate_data()
+    raw_import, raw_export = get_hts_dataframe()
+    generate_plate_data(raw_import)
+    generate_net_macronutrients_data(raw_import, raw_export)
 
 
 if __name__ == '__main__':

@@ -3,8 +3,20 @@ from pathlib import Path
 from utils.converter_utils import ConverterUtils, get_macronutrients
 
 
-def main():
-    pass
+def generate_net_macronutrients_data(import_data: pd.DataFrame, export_data: pd.DataFrame) -> pd.DataFrame:
+    # Separate dataframe
+    labels = import_data[["year", "trimester"]]
+
+    # Add year-trimester section for labeling
+    labels["period"] = labels["year"].apply(lambda x: 'Y' + str(x)[-2:]) + labels["trimester"]
+
+    # Drop from main dataframe
+    data_section_import = import_data.drop(columns=["year", "trimester"])
+    data_section_export = export_data.drop(columns=["year", "trimester"])
+
+    net_dataframe = data_section_import - data_section_export
+    net_dataframe = pd.concat([labels, net_dataframe], axis=1)
+    return net_dataframe
 
 
 def generate_hts_macronutrients_data(hts_data: pd.DataFrame) -> pd.DataFrame:
@@ -94,5 +106,10 @@ def generate_hts_macronutrients_data(hts_data: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    generate_hts_macronutrients_data('data/raw_hts/imports/latest_hts_imports.csv')
-    generate_hts_macronutrients_data('data/raw_hts/exports/latest_hts_exports.csv')
+    from scraper import get_hts_dataframe
+
+    raw_import, raw_export = get_hts_dataframe()
+    processed_import = generate_hts_macronutrients_data(raw_import)
+    processed_export = generate_hts_macronutrients_data(raw_export)
+
+    net_data = generate_net_macronutrients_data(processed_import, processed_export)
