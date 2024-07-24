@@ -1,4 +1,5 @@
 import pandas as pd
+from pathlib import Path
 from utils.converter_utils import ConverterUtils, get_macronutrients
 
 
@@ -6,21 +7,25 @@ def main():
     pass
 
 
-def generate_hts_macronutrients_data(hts_data_path):
-    hts_data = pd.read_csv(hts_data_path)
+def generate_hts_macronutrients_data(hts_data: pd.DataFrame) -> pd.DataFrame:
+    # Create ConverterUtils
+    cur_dir = Path(__file__).parent.resolve()
+    reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
+    utils = ConverterUtils(reference_file_path)
 
-    # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
+    # Get list of valid schedule_b codes (codes for which macronutrient data exists)
+    valid_codes = utils.get_valid_schedule_b_codes()
+
+    # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean("'01028796", 4) => 0102)
     def clean_hts_value(hts_value, figures=4):
         return int(hts_value[1:figures + 1])
 
     hts_data["HTS"] = hts_data["HTS"].apply(clean_hts_value)
 
-    # Filter rows based on desired schedule_b codes
-    utils = ConverterUtils('data/schedule_b_reference.xlsx')
-    codes = utils.get_schedule_b_codes()
-    filtered_codes = hts_data[hts_data["HTS"].isin(codes)]
+    # Filter rows based on valid schedule_b codes
+    filtered_codes = hts_data[hts_data["HTS"].isin(valid_codes)]
 
-    # Drop rows with no value in unit_1 (invalid)
+    # Drop rows with no value in unit_1 (invalid unit)
     invalid_rows = filtered_codes[filtered_codes["unit_1"].apply(lambda x: not isinstance(x, str))]
     filtered_codes = filtered_codes.drop(invalid_rows.index)
 
@@ -49,27 +54,43 @@ def generate_hts_macronutrients_data(hts_data_path):
     filtered_codes["qty_1_conv"] = filtered_codes["unit_1"].apply(lambda x: unit_to_kg_factor[x]) * filtered_codes[
         "qty_1"]
 
-    # Add get total macronutrients for each product
-    print("Calculating total macronutrients...")
+    # function to map months to trimesters
+    def month_to_trimester(month):
+        if month in [1, 2, 3]:
+            return 'Q1'
+        elif month in [4, 5, 6]:
+            return 'Q2'
+        elif month in [7, 8, 9]:
+            return 'Q3'
+        elif month in [10, 11, 12]:
+            return 'Q4'
+        else:
+            return None
 
-    def get_total_macronutrients(row, macronutrient):
-        return utils.get_schedule_b_macronutrient_data(row["HTS"])[macronutrient] * row["qty_1_conv"]
+    # Group rows by HTS, year and trimester and aggregate quantities, unit does not matter since all units are KG
+    df = filtered_codes.copy()
+    df['trimester'] = df['month'].apply(month_to_trimester)
+    df = df.drop(df[df["year"] == 2002].index)  # Optional, not sure
+    trimester_data = df.groupby(['HTS', 'year', 'trimester']).agg({'qty_1_conv': 'sum'}).reset_index()
 
-    for mn in get_macronutrients():
-        print(mn)
-        filtered_codes[mn] = filtered_codes.apply(lambda x: get_total_macronutrients(x, mn), axis=1)
+    # Calculate total macronutrients for each valid code
+    all_codes_data = utils.get_schedule_b_macronutrient_data_list(valid_codes)
+    for code in all_codes_data:
 
-    # Clean up empty cells with 0
-    filtered_codes.fillna(0, inplace=True)
+        # Get macronutrient data for current code
+        cur_code_data = all_codes_data[code]
 
-    macronutrients_data_out = f'data/macronutrients/hts_macronutrients_data_{mode}.csv'
-    filtered_codes.to_csv(macronutrients_data_out, index=False)
+        for macronutrient in cur_code_data:
+            # macronutrient col = quantity * macronutrient amount per unit for current HTS code
+            trimester_data.loc[trimester_data["HTS"] == code, macronutrient] = (trimester_data["qty_1_conv"] *
+                                                                                cur_code_data[macronutrient])
 
-    print(f"Done, data written to {macronutrients_data_out}")
+    # Finish aggregating all macronutrient data for each quarter
+    trimester_data = trimester_data.groupby(['year', 'trimester']).agg({
+        macronutrient: "sum" for macronutrient in get_macronutrients()
+    }).reset_index()
 
-
-def generate_net_macronutrients_data(import_datapath, export_datapath):
-    pass
+    return trimester_data
 
 
 if __name__ == '__main__':
