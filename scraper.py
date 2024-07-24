@@ -89,7 +89,6 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
 
         files = sorted(
             [f for f in os.listdir(download_dir) if os.path.isfile(os.path.join(download_dir, f))],
-            key=lambda x: os.path.getmtime(os.path.join(download_dir, x)),
             reverse=True
         )
         print(f"Download completed: {files}")
