@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, send_file, abort, current_app, request, json, render_template
 from pathlib import Path
 from werkzeug.security import safe_join
-from charts import generate_timeseries_chart
 from process_fiscal_data import get_country_list, get_net_value_country
+from fetch_timeseries_data import fetch_timeseries_data
 
 routes = Blueprint('my_routes', __name__)
 
@@ -26,7 +26,7 @@ def nutrient_distribution():
         abort(404)  # Return a 404 error if the file is not found
 
 
-@routes.route('/get_timeseries_chart', methods=['GET'])
+@routes.route('/get_timeseries_data', methods=['GET'])
 def get_timeseries_chart():
     try:
         tseries_start = int(request.args.get('start_year'))
@@ -34,14 +34,8 @@ def get_timeseries_chart():
     except (TypeError, ValueError):
         return jsonify({'error': 'Please provide valid start and end years'}), 400
 
-    macronutrient = request.args.get('macronutrient')
-
-    if not macronutrient:
-        return jsonify({'error': 'Please provide a valid macronutrient'}), 400
-
-    # TODO Refactor to offload graph generation to frontend
-    plot = generate_timeseries_chart(tseries_start, tseries_end, macronutrient)
-    return send_file(plot, mimetype='image/png', as_attachment=True, download_name='timeseries_chart.png')
+    data = fetch_timeseries_data(tseries_start, tseries_end)
+    return jsonify(data)
 
 
 @routes.route('/get_fiscal_data_country', methods=['GET'])

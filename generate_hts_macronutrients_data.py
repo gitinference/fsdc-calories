@@ -113,3 +113,7 @@ if __name__ == '__main__':
     processed_export = generate_hts_macronutrients_data(raw_export)
 
     net_data = generate_net_macronutrients_data(processed_import, processed_export)
+
+    cur_dir = Path(__file__).parent.resolve()
+    out = str(cur_dir / "data" / "macronutrients" / "net_macronutrients.csv")
+    net_data.to_csv(out, index=False)
