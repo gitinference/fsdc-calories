@@ -3,6 +3,7 @@ from pathlib import Path
 from werkzeug.security import safe_join
 from process_fiscal_data import get_country_list, get_net_value_country
 from fetch_timeseries_data import fetch_timeseries_data
+from utils.converter_utils import get_macronutrients
 
 routes = Blueprint('my_routes', __name__)
 
@@ -53,3 +54,8 @@ def get_fiscal_data_country():
 @routes.route('/get_fiscal_country_list', methods=['GET'])
 def get_fiscal_country_list():
     return jsonify(get_country_list())
+
+
+@routes.route('/get_macronutrient_list', methods=['GET'])
+def get_macronutrient_list():
+    return jsonify(get_macronutrients())
