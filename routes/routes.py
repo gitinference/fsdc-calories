@@ -1,9 +1,10 @@
-from flask import Blueprint, jsonify, send_file, abort, current_app, request, json, render_template
+from flask import Blueprint, jsonify, send_file, abort, current_app, request, json, render_template_string
 from pathlib import Path
 from werkzeug.security import safe_join
 from process_fiscal_data import get_country_list, get_net_value_country
 from fetch_timeseries_data import fetch_timeseries_data
 from utils.converter_utils import get_macronutrients
+from charts import get_energy_timeseries_chart_div
 
 routes = Blueprint('my_routes', __name__)
 
@@ -59,3 +60,9 @@ def get_fiscal_country_list():
 @routes.route('/get_macronutrient_list', methods=['GET'])
 def get_macronutrient_list():
     return jsonify(get_macronutrients())
+
+
+@routes.route('/energy_chart', methods=['GET'])
+def get_energy_chart():
+    div = get_energy_timeseries_chart_div()
+    return render_template_string(div)
