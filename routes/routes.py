@@ -64,5 +64,18 @@ def get_macronutrient_list():
 
 @routes.route('/energy_chart', methods=['GET'])
 def get_energy_chart():
-    div = get_energy_timeseries_chart_div()
-    return render_template_string(div)
+
+    try:
+        selected_category = request.args.get("category", type=str)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid category.'}), 400
+
+    if not selected_category:
+        return jsonify({'error': 'Please provide a selected category'}), 400
+
+    try:
+        div = get_energy_timeseries_chart_div()
+    except KeyError:
+        return jsonify({'error': 'Invalid category.'}), 400
+
+    return div
