@@ -41,7 +41,7 @@ def fetch_energy_data():
         val = row.split('/')
         val = [num.zfill(2) for num in val]  # Add left zeros up to 2 characters
 
-        # Convert from MM/DD/YYYY to YYYY/MM/DD
+        # Convert from MM/DD/YYYY to ISO standard YYYY-MM-DD
         val[0], val[1], val[2] = val[2], val[0], val[1]
         val = "-".join(val)
         return val
