@@ -75,7 +75,7 @@ def get_energy_chart():
         return jsonify({'error': 'Please provide a selected category'}), 400
 
     try:
-        div = get_energy_timeseries_chart_div()
+        div = get_energy_timeseries_chart_div(selected_category)
     except KeyError:
         return jsonify({'error': 'Invalid category.'}), 400
 
