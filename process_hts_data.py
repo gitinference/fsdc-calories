@@ -19,7 +19,7 @@ def generate_net_macronutrients_data(import_data: pd.DataFrame, export_data: pd.
     return net_dataframe
 
 
-def generate_hts_macronutrients_data(hts_data: pd.DataFrame) -> pd.DataFrame:
+def process_hts_data(hts_data: pd.DataFrame) -> pd.DataFrame:
     # Create ConverterUtils
     cur_dir = Path(__file__).parent.resolve()
     reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     from scraper import get_hts_dataframe
 
     raw_import, raw_export = get_hts_dataframe()
-    processed_import = generate_hts_macronutrients_data(raw_import)
-    processed_export = generate_hts_macronutrients_data(raw_export)
+    processed_import = process_hts_data(raw_import)
+    processed_export = process_hts_data(raw_export)
 
     net_data = generate_net_macronutrients_data(processed_import, processed_export)
 
