@@ -1,7 +1,4 @@
-import pandas as pd
-import io
 import plotly.express as px
-import plotly.graph_objects as go
 
 from process_energy_data import fetch_energy_data, get_energy_category_map
 

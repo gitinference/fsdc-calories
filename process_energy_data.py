@@ -1,11 +1,9 @@
-import pandas as pd
-import urllib.request
-from tempfile import TemporaryFile
 import ssl
-import chardet
-import matplotlib.pyplot as plt
-import numpy as np
+import urllib.request
 
+import chardet
+import numpy as np
+import pandas as pd
 
 ssl._create_default_https_context = ssl._create_unverified_context
 

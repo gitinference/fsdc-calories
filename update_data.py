@@ -1,6 +1,6 @@
-from scraper import get_hts_dataframe
-from process_plate_data import process_plate_data
 from process_hts_data import generate_net_macronutrients_data, process_hts_data
+from process_plate_data import process_plate_data
+from scraper import get_hts_dataframe
 
 
 def update_data():

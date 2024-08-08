@@ -1,15 +1,15 @@
+import os
+import platform
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.chrome.service import Service
-import os
-import time
-import platform
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.ui import WebDriverWait
 
 """
 This file scrapes the government website and downloads import and export data.

@@ -1,11 +1,12 @@
-from flask import Blueprint, jsonify, abort, current_app, request, json, render_template_string, render_template
 from pathlib import Path
-from werkzeug.security import safe_join
-from process_fiscal_data import get_country_list, get_net_value_country
-from fetch_timeseries_data import fetch_timeseries_data
-from utils.converter_utils import get_macronutrients
+
+from flask import Blueprint, abort, current_app, json, jsonify, render_template, request
+
 from charts import get_energy_timeseries_chart_div
+from fetch_timeseries_data import fetch_timeseries_data
 from process_energy_data import get_energy_category_map
+from process_fiscal_data import get_country_list, get_net_value_country
+from utils.converter_utils import get_macronutrients
 
 routes = Blueprint('my_routes', __name__)
 

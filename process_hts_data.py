@@ -1,5 +1,7 @@
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+
 from utils.converter_utils import ConverterUtils, get_macronutrients
 
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Any
+from typing import Any
 
 import pandas as pd
 

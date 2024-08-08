@@ -1,7 +1,9 @@
-import pandas as pd
-from utils.converter_utils import ConverterUtils
-from utils.constants import Constants
 import json
+
+import pandas as pd
+
+from utils.constants import Constants
+from utils.converter_utils import ConverterUtils
 
 
 def process_plate_data(hts_dataframe: pd.DataFrame):
