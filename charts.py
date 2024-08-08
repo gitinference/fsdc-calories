@@ -1,7 +1,3 @@
-import json
-
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import pandas as pd
 import io
 import plotly.express as px
