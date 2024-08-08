@@ -84,7 +84,7 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
     download_button.click()
 
     # Function to wait for the download to complete
-    def wait_for_download(directory, timeout=60):
+    def wait_for_download(directory, timeout=120):
         seconds = 0
         dl_wait = True
         while dl_wait and seconds < timeout:
