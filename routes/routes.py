@@ -5,6 +5,7 @@ from process_fiscal_data import get_country_list, get_net_value_country
 from fetch_timeseries_data import fetch_timeseries_data
 from utils.converter_utils import get_macronutrients
 from charts import get_energy_timeseries_chart_div
+from process_energy_data import get_energy_category_map
 
 routes = Blueprint('my_routes', __name__)
 
@@ -64,7 +65,6 @@ def get_macronutrient_list():
 
 @routes.route('/energy_chart', methods=['GET'])
 def get_energy_chart():
-
     try:
         selected_category = request.args.get("category", type=str)
     except (TypeError, ValueError):
@@ -79,3 +79,8 @@ def get_energy_chart():
         return jsonify({'error': 'Invalid category.'}), 400
 
     return div
+
+
+@routes.route('/get_energy_categories', methods=['GET'])
+def get_energy_categories():
+    return jsonify(get_energy_category_map())
