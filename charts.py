@@ -31,7 +31,7 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
         ),
     )
 
-    div = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"chart_{category}")
 
     return div
 
