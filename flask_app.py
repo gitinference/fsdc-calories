@@ -11,6 +11,7 @@ CORS(app, resources={r"/*": {
         "http://127.0.0.1:5000",  # Werkzeug WSGI Development Server
         "http://localhost:5000",  # Werkzeug WSGI Development Server
         "http://localhost:63342",  # PyCharm HTML Live Server
+        "http://localhost:5500",  # VSCode HTML Live Server
         "https://www.uprm.edu"
     ]
 }})
