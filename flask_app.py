@@ -2,6 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from routes.routes import routes
+from update_data import update_data
 
 app = Flask(__name__)
 app.register_blueprint(routes)
@@ -13,6 +14,3 @@ CORS(app, resources={r"/*": {
         "https://www.uprm.edu"
     ]
 }})
-
-if __name__ == '__main__':
-    app.run()
