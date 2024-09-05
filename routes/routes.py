@@ -1,10 +1,12 @@
-from flask import Blueprint, jsonify, abort, current_app, request, json, render_template_string, render_template
 from pathlib import Path
-from werkzeug.security import safe_join
-from process_fiscal_data import get_country_list, get_net_value_country
-from fetch_timeseries_data import fetch_timeseries_data
-from utils.converter_utils import get_macronutrients
+
+from flask import Blueprint, abort, current_app, json, jsonify, render_template, request
+
 from charts import get_energy_timeseries_chart_div
+from fetch_timeseries_data import fetch_timeseries_data
+from process_energy_data import get_energy_category_map
+from process_fiscal_data import get_country_list, get_net_value_country
+from utils.converter_utils import get_macronutrients
 
 routes = Blueprint('my_routes', __name__)
 
@@ -12,6 +14,16 @@ routes = Blueprint('my_routes', __name__)
 @routes.route('/')
 def home():
     return render_template('index.html')
+
+
+@routes.route('/graphs/timeseries_agricultural_energy', methods=['GET'])
+def graphs_nutrient_distribution():
+    return render_template('energy_chart.html')
+
+
+@routes.route('/graphs/my_plate', methods=['GET'])
+def graphs_my_plate():
+    return render_template('my_plate.html')
 
 
 @routes.route('/nutrient_distribution', methods=['GET'])
@@ -64,5 +76,22 @@ def get_macronutrient_list():
 
 @routes.route('/energy_chart', methods=['GET'])
 def get_energy_chart():
-    div = get_energy_timeseries_chart_div()
-    return render_template_string(div)
+    try:
+        selected_category = request.args.get("category", type=str)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid category.'}), 400
+
+    if not selected_category:
+        return jsonify({'error': 'Please provide a selected category'}), 400
+
+    try:
+        div = get_energy_timeseries_chart_div(selected_category)
+    except KeyError:
+        return jsonify({'error': 'Invalid category.'}), 400
+
+    return div
+
+
+@routes.route('/get_energy_categories', methods=['GET'])
+def get_energy_categories():
+    return jsonify(get_energy_category_map())

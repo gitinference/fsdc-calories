@@ -1,0 +1,14 @@
+services:
+  fsdc-server-flask:
+    image: tiangolo/uwsgi-nginx-flask:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "56733:80"
+    volumes:
+      - .:/var/www/app
+    environment:
+      STATIC_URL: "/static"
+      STATIC_PATH: "/var/www/app/static"
+    container_name: fsdc-server-flask

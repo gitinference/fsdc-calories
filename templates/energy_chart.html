@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Energy Charts</title>
+
+</head>
+<body>
+<div id="energy-chart-selector-container">
+    <label for="energy-category-dropdown">Category: </label>
+    <select id="energy-category-dropdown"></select>
+</div>
+<div id="energy-chart-container"></div>
+
+<script>
+    async function fetchCategories() {
+        {#const url = "https://joelalvarado.pythonanywhere.com/get_energy_categories"#}
+        const url = "http://127.0.0.1:5000/get_energy_categories"
+        {#const url = "http://157.230.5.10:56733/get_energy_categories"#}
+        return await fetch(url)
+            .then(res => res.json())
+    }
+
+    async function populateEnergyCategories() {
+        let categories = await fetchCategories();
+        const dropdown = document.getElementById('energy-category-dropdown');
+        for (let key in categories) {
+            if (categories.hasOwnProperty(key)) {
+                let option = document.createElement('option');
+                option.value = key;
+                option.textContent = categories[key];
+                dropdown.appendChild(option);
+            }
+        }
+
+        // Add event listener for dropdown changes
+        dropdown.addEventListener('change', handleCategoryChange);
+
+        // Handle default selection for initial graph
+        await handleCategoryChange({target: dropdown});
+    }
+
+    populateEnergyCategories()
+
+    async function handleCategoryChange(event) {
+
+        // Set initial innerHTML to "Loading"
+        const container_div = document.getElementById("energy-chart-container")
+        container_div.innerHTML = "<h1>Loading<h1>"
+
+        const selectedCategory = event.target.value;
+
+        // Fetch respective Plotly graph for category
+        const url = new URL("http://127.0.0.1:5000/energy_chart") // Responds with a Plotly div
+        url.searchParams.append("category", selectedCategory)
+
+        // Update innerHTMl with selected plotly chart
+        container_div.innerHTML = await fetch(url).then(res => res.text())
+
+        // Re-render any necessary scripts for Plotly or other libraries
+        const scripts = container_div.getElementsByTagName('script');
+        for (let script of scripts) {
+            eval(script.innerHTML); // Evaluate inline scripts for Plotly
+        }
+    }
+</script>
+
+</body>
+</html>

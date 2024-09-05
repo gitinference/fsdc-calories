@@ -1,15 +1,17 @@
-import pandas as pd
-from utils.converter_utils import ConverterUtils
-from utils.constants import Constants
 import json
 
+import pandas as pd
 
-def generate_plate_data(hts_dataframe: pd.DataFrame):
+from utils.constants import Constants
+from utils.converter_utils import ConverterUtils
+
+
+def process_plate_data(hts_dataframe: pd.DataFrame):
     print("Processing HTS data...")
 
     # Data paths
     schedule_b_reference_path = 'data/schedule_b_reference.xlsx'
-    hts_data = hts_dataframe
+    hts_data = hts_dataframe.copy()
 
     # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
     def clean_hts_value(hts_value, figures=4):

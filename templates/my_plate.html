@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Food Security Standalone Graphs</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script>
+        google.charts.load('current', {packages: ['corechart']});
+
+        let chartData = null;
+
+        async function fetchData() {
+            const url = 'http://localhost:5000/nutrient_distribution'
+            {#const url = 'https://joelalvarado.pythonanywhere.com/nutrient_distribution'#}
+            let resp = await fetch(url);
+            let jobj = await resp.json();
+            return jobj
+        }
+
+        async function initChartData() {
+            chartData = await fetchData()
+            chartData = JSON.stringify(chartData)
+            chartData = JSON.parse(chartData)
+        }
+
+        initChartData()
+
+        function drawPieChart() {
+
+            // Early exit if data isn't ready yet
+            if (!chartData) {
+                alert("Data is not ready.")
+                return
+            }
+
+            // Get selected year
+            let year = document.getElementById('nutrient-pie-chart-year').value
+            year = parseInt(year)
+
+            // Get yearly data for selected year
+            let yearlyData = chartData[year];
+            // console.log(yearlyData)
+
+            // Create array for new datatable
+            let data = [["macronutrient", "amount"]]
+            for (const prop in yearlyData) {
+                data.push([prop, yearlyData[prop]])
+            }
+
+            // console.log(data)
+
+            // Set Data
+            data = google.visualization.arrayToDataTable(data)
+
+            // Set Options
+            let chartTitle = `Macronutrient distribution of ${year}`
+            if (new Date().getFullYear() === year) {
+                // Add month data to chart title
+                let latestMonth = chartData["latest_year_extra"]["latest_month"]
+                chartTitle += ` (as of month ${latestMonth})`
+            }
+
+            const options = {
+                title: chartTitle
+            };
+
+            // Draw
+            const chart = new google.visualization.PieChart(document.getElementById('pie-chart'));
+            chart.draw(data, options);
+        }
+    </script>
+
+</head>
+<body>
+<div id="pie-chart-selection-and-chart">
+    <h2>Nutrient Distribution Graphs</h2>
+    <form id="chart-options">
+        <label for="nutrient-pie-chart-year">Choose a year:</label>
+        <select required id='nutrient-pie-chart-year' name="year">
+        </select>
+        <button type="button" onclick="drawPieChart()">Show graphs</button>
+    </form>
+    <div id="pie-chart" style="max-width:700px; height:400px"></div>
+</div>
+
+<script>
+    let currentYear = new Date().getFullYear();
+    let earliestYear = 2002;
+    while (currentYear >= earliestYear) {
+
+        let select_ids = ['nutrient-pie-chart-year']
+        for (let i = 0; i < select_ids.length; i++) {
+            let dateOption = document.createElement('option');
+            dateOption.text = currentYear;
+            dateOption.value = currentYear;
+            document.getElementById(select_ids[i]).add(dateOption);
+        }
+
+        currentYear -= 1
+    }
+</script>
+
+</body>
+</html>

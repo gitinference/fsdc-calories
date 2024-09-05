@@ -1,15 +1,15 @@
+import os
+import platform
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.chrome.service import Service
-import os
-import time
-import platform
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.ui import WebDriverWait
 
 """
 This file scrapes the government website and downloads import and export data.
@@ -84,7 +84,7 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
     download_button.click()
 
     # Function to wait for the download to complete
-    def wait_for_download(directory, timeout=60):
+    def wait_for_download(directory, timeout=120):
         seconds = 0
         dl_wait = True
         while dl_wait and seconds < timeout:
