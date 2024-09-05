@@ -2,8 +2,8 @@ services:
   web:
     build:
       context: .
-      dockerfile: fastapi.Dockerfile
-    command: gunicorn -k uvicorn.workers.UvicornWorker main:app --bind :80
+      dockerfile: flask.Dockerfile
+    command: gunicorn main:app --bind :80
     networks:
       - nginx_network
     
