@@ -1,13 +1,26 @@
 services:
   web:
-    build: ./fastapi.Dockerfile
-    command: fastapi dev main.py
-    expose:
-      - 8000
+    build:
+      context: .
+      dockerfile: fastapi.Dockerfile
+    command: gunicorn -k uvicorn.workers.UvicornWorker main:app --bind :80
+    networks:
+      - nginx_network
+    
   nginx:
-    build: ./nginx/nginx.Dockerfile
+    image: nginx
     ports:
-      - 1337:80
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - /etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem/
+      - /etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem
     depends_on:
       - web
+    networks:
+      - nginx_network
 
+networks:
+  nginx_network:
+    driver: bridge
