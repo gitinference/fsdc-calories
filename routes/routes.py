@@ -2,7 +2,7 @@ from pathlib import Path
 
 from flask import Blueprint, abort, current_app, json, jsonify, render_template, request
 
-from charts import get_energy_timeseries_chart_div
+from charts import get_energy_timeseries_chart_div, get_macronutrient_timeseries_chart_div, get_fiscal_timeseries_chart_div
 from process_energy_data import get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
 from utils.converter_utils import get_macronutrients
@@ -40,6 +40,16 @@ def get_fiscal_country_list():
 
 
 """ MACRONUTRIENT ROUTES """
+@routes.route('/get_macronutrient_chart')
+def get_macronutrient_chart():
+    category = request.args.get('category', default="calories", type=str)
+    try:
+        div = get_macronutrient_timeseries_chart_div(category)
+    except KeyError as err:
+        return jsonify({'error': str(err)}), 400
+    return div
+
+
 @routes.route('/get_macronutrient_list', methods=['GET'])
 def get_macronutrient_list():
     return jsonify(get_macronutrients())
