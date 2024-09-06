@@ -11,21 +11,6 @@ from utils.converter_utils import get_macronutrients
 routes = Blueprint('my_routes', __name__)
 
 
-@routes.route('/')
-def home():
-    return render_template('index.html')
-
-
-@routes.route('/graphs/timeseries_agricultural_energy', methods=['GET'])
-def graphs_nutrient_distribution():
-    return render_template('energy_chart.html')
-
-
-@routes.route('/graphs/my_plate', methods=['GET'])
-def graphs_my_plate():
-    return render_template('my_plate.html')
-
-
 @routes.route('/nutrient_distribution', methods=['GET'])
 def nutrient_distribution():
     current_dir = Path(__file__).parent.resolve()
