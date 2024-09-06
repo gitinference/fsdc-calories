@@ -7,6 +7,7 @@ from process_fiscal_data import get_net_value_country, get_country_list
 
 
 def main():
+
 def get_macronutrient_timeseries_chart_div(category: str):
     cur_dir = Path(__file__).parent.resolve()
     df_path = str(cur_dir / "data" / "macronutrients" / "net_macronutrients.csv")
