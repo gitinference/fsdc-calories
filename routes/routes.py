@@ -25,18 +25,6 @@ def nutrient_distribution():
         abort(404)  # Return a 404 error if the file is not found
 
 
-@routes.route('/get_timeseries_data', methods=['GET'])
-def get_timeseries_chart():
-    try:
-        tseries_start = int(request.args.get('start_year'))
-        tseries_end = int(request.args.get('end_year'))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Please provide valid start and end years'}), 400
-
-    data = fetch_timeseries_data(tseries_start, tseries_end)
-    return jsonify(data)
-
-
 @routes.route('/get_fiscal_data_country', methods=['GET'])
 def get_fiscal_data_country():
     country = request.args.get('country', default="United States", type=str)
