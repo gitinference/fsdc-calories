@@ -1,10 +1,16 @@
 import plotly.express as px
 
 from process_energy_data import fetch_energy_data, get_energy_category_map
+from process_fiscal_data import get_net_value_country, get_country_list
 
 
 def main():
     get_energy_timeseries_chart_div()
+
+
+def get_fiscal_timeseries_chart_div(country: str):
+    df = get_net_value_country(country)
+    return '<h1>Under construction<h1>'
 
 
 def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mkwh"):
