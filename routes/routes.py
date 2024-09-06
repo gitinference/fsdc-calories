@@ -10,7 +10,7 @@ from utils.converter_utils import get_macronutrients
 
 routes = Blueprint('my_routes', __name__)
 
-
+""" MY PLATE ROUTES """
 @routes.route('/nutrient_distribution', methods=['GET'])
 def nutrient_distribution():
     current_dir = Path(__file__).parent.resolve()
@@ -24,9 +24,9 @@ def nutrient_distribution():
         current_app.logger.error(str(Path(fp).resolve()))
         abort(404)  # Return a 404 error if the file is not found
 
-
-@routes.route('/get_fiscal_data_country', methods=['GET'])
-def get_fiscal_data_country():
+""" FISCAL DATA ROUTES """
+@routes.route('/get_fiscal_chart', methods=['GET'])
+def get_fiscal_chart():
     country = request.args.get('country', default="United States", type=str)
 
     try:
@@ -42,11 +42,13 @@ def get_fiscal_country_list():
     return jsonify(get_country_list())
 
 
+""" MACRONUTRIENT ROUTES """
 @routes.route('/get_macronutrient_list', methods=['GET'])
 def get_macronutrient_list():
     return jsonify(get_macronutrients())
 
 
+""" ENERGY RELATED ROUTES """"
 @routes.route('/get_energy_chart', methods=['GET'])
 def get_energy_chart():
     try:
