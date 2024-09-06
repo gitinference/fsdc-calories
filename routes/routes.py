@@ -28,13 +28,11 @@ def nutrient_distribution():
 @routes.route('/get_fiscal_chart', methods=['GET'])
 def get_fiscal_chart():
     country = request.args.get('country', default="United States", type=str)
-
     try:
-        data = get_net_value_country(country)
+        div = get_fiscal_timeseries_chart_div(country)
     except KeyError as err:
         return jsonify({'error': str(err)}), 400
-
-    return jsonify(data)
+    return div
 
 
 @routes.route('/get_fiscal_country_list', methods=['GET'])
