@@ -34,12 +34,15 @@ def get_hts_dataframe() -> (pd.DataFrame, pd.DataFrame):
     current_system = platform.system()
 
     if current_system == 'Linux':
-        driver = webdriver.Chrome(options=chrome_options)
+        chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-linux64" / "chromedriver")
+        chromed_binary_path = str(current_dir / "chromedriver" / "chrome-linux64" / "chrome")
+        chrome_options.binary_location = chromed_binary_path
     elif current_system == 'Windows':
         chromedriver_binary_path = str(current_dir / "chromedriver" / "chromedriver-win64" / "chromedriver.exe")
-        driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
     else:
         raise OSError(f"Unsupported OS: {current_system}")
+    
+    driver = webdriver.Chrome(options=chrome_options, service=Service(chromedriver_binary_path))
 
     print("Web driver ready, opening...")
 
