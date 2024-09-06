@@ -33,7 +33,24 @@ def get_macronutrient_timeseries_chart_div(category: str):
 
 def get_fiscal_timeseries_chart_div(country: str):
     df = get_net_value_country(country)
-    return '<h1>Under construction<h1>'
+    
+    # Create figure
+    fig = px.line(df, x="Fiscal Year", y="net_value")
+    # Set title
+    fig.update_layout(
+        title_text=f"{country} Net Value Products"
+    )
+    # Add range slider
+    fig.update_layout(
+        xaxis=dict(
+            rangeslider=dict(
+                visible=True
+            ),
+            type="-"
+        ),
+    )
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"chart_{country}")
+    return div
 
 
 def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mkwh"):
