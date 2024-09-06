@@ -3,7 +3,6 @@ from pathlib import Path
 from flask import Blueprint, abort, current_app, json, jsonify, render_template, request
 
 from charts import get_energy_timeseries_chart_div
-from fetch_timeseries_data import fetch_timeseries_data
 from process_energy_data import get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
 from utils.converter_utils import get_macronutrients
@@ -46,7 +45,7 @@ def get_macronutrient_list():
     return jsonify(get_macronutrients())
 
 
-""" ENERGY ROUTES """"
+""" ENERGY ROUTES """
 @routes.route('/get_energy_chart', methods=['GET'])
 def get_energy_chart():
     try:
