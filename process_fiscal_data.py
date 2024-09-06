@@ -18,9 +18,9 @@ def get_net_value_country(country: str) -> list[list[Any]]:
     selected_country_data = DATAFRAME[DATAFRAME["country"] == country]
 
     # Format into a list: [[Year1, Net Value1], [Year2, Net Value2], ...]
-    selected_country_data = [
-        [str(row["Fiscal Year"]), row["net_value"]] for _, row in selected_country_data.iterrows()
-    ]
+    # selected_country_data = [
+    #     [str(row["Fiscal Year"]), row["net_value"]] for _, row in selected_country_data.iterrows()
+    # ]
 
     return selected_country_data
 
