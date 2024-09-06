@@ -47,7 +47,7 @@ def get_macronutrient_list():
     return jsonify(get_macronutrients())
 
 
-@routes.route('/energy_chart', methods=['GET'])
+@routes.route('/get_energy_chart', methods=['GET'])
 def get_energy_chart():
     try:
         selected_category = request.args.get("category", type=str)

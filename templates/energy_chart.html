@@ -62,7 +62,7 @@
       const selectedCategory = event.target.value;
 
       // Fetch respective Plotly graph for category
-      const url = new URL("energy_chart", baseUrl) // Responds with a Plotly div
+      const url = new URL("get_energy_chart", baseUrl) // Responds with a Plotly div
       url.searchParams.append("category", selectedCategory)
 
       // Update innerHTMl with selected plotly chart
