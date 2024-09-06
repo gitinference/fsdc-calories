@@ -5,7 +5,28 @@ from process_fiscal_data import get_net_value_country, get_country_list
 
 
 def main():
-    get_energy_timeseries_chart_div()
+def get_macronutrient_timeseries_chart_div(category: str):
+    cur_dir = Path(__file__).parent.resolve()
+    df_path = str(cur_dir / "data" / "macronutrients" / "net_macronutrients.csv")
+    df = pd.read_csv(df_path)
+    
+    # Create figure
+    fig = px.line(df, x="period", y=category)
+    # Set title
+    fig.update_layout(
+        title_text=""
+    )
+    # Add range slider
+    fig.update_layout(
+        xaxis=dict(
+            rangeslider=dict(
+                visible=True
+            ),
+            type="-"
+        ),
+    )
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"chart_{category}")
+    return div
 
 
 def get_fiscal_timeseries_chart_div(country: str):
