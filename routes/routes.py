@@ -24,7 +24,7 @@ def nutrient_distribution():
         current_app.logger.error(str(Path(fp).resolve()))
         abort(404)  # Return a 404 error if the file is not found
 
-""" FISCAL DATA ROUTES """
+""" FISCAL ROUTES """
 @routes.route('/get_fiscal_chart', methods=['GET'])
 def get_fiscal_chart():
     country = request.args.get('country', default="United States", type=str)
@@ -48,7 +48,7 @@ def get_macronutrient_list():
     return jsonify(get_macronutrients())
 
 
-""" ENERGY RELATED ROUTES """"
+""" ENERGY ROUTES """"
 @routes.route('/get_energy_chart', methods=['GET'])
 def get_energy_chart():
     try:
