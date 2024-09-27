@@ -251,4 +251,4 @@ cython_debug/
 *.png
 *.csv
 chromedriver
-
+.vscode
