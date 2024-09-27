@@ -1,15 +1,18 @@
 from pathlib import Path
 
+from jp_imports.data_process import DataProcess
 import pandas as pd
 from jp_imports import data_process
 
-from utils.converter_utils import ConverterUtils, get_macronutrients
+from utils.converter_utils import ConverterUtils
 
 
 def process_hts_data() -> pd.DataFrame:
     CUR_DIR = Path(__file__).parent.resolve()
     SAVING_DIR = str(CUR_DIR / "data") + "/"
-    df = data_process.DataProcess(saving_dir=SAVING_DIR, instance="jp_instetute").process_int_jp(time="monthly", types="total")
+    df = data_process.DataProcess(
+        saving_dir=SAVING_DIR, instance="jp_instetute"
+    ).process_int_jp(time="monthly", types="total")
     print(df.head())
     pass
     # # Group rows by HTS, year and trimester and aggregate quantities, unit does not matter since all units are KG
@@ -38,5 +41,5 @@ def process_hts_data() -> pd.DataFrame:
     # return trimester_data
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(process_hts_data())
