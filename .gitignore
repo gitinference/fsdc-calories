@@ -251,4 +251,5 @@ cython_debug/
 *.png
 *.csv
 chromedriver
-
+data/external
+data/raw

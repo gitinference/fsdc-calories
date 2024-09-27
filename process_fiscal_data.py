@@ -12,7 +12,7 @@ DATAFRAME = pd.read_pickle(PICKLE_PATH)
 def get_net_value_country(country: str) -> list[list[Any]]:
     # If country does not exist in data, raise KeyError
     if country not in get_country_list():
-        raise KeyError(f'Country {country} is not a valid country')
+        raise KeyError(f"Country {country} is not a valid country")
 
     # Get selected country data
     selected_country_data = DATAFRAME[DATAFRAME["country"] == country]

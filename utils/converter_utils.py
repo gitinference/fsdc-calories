@@ -1,38 +1,24 @@
 import numpy as np
 import pandas as pd
 
-from utils.constants import Constants
-
-
-def get_macronutrients():
-    return [
-        'calories',
-        'total_fat_g',
-        'protein_g',
-        'saturated_fat_g',
-        'cholesterol_mg',
-        'sodium_mg',
-        'carbohydrate_g',
-        'fiber_g',
-        'sugar_g',
-        'vitamin_d_iu',
-        'calcium_mg',
-        'potassium_mg',
-        'iron_mg'
-    ]
-
 
 class ConverterUtils:
 
     def __init__(self, filename: str):
-        self.data = pd.read_excel(filename)
-        self.data = self.data.replace('.', np.nan)  # Replace "." with NaN value
+        self.data = pd.read_excel(filename, dtype="object")
+        self.data = self.data.replace(".", 0)  # Replace "." with NaN value
         # Drop all rows that contain NaN values after first 2 columns
-        self.data = self.data.dropna(how='all', subset=self.data.columns[2:])
+        self.data = self.data.dropna(how="any", subset=self.data.columns[2:])
         self.data = self.data[self.data.columns[:-7]]
+        self.data["schedule_b"] = self.data["schedule_b"].astype(str)
+        self.data = self.data.dropna()
+        self.data.loc[:, "schedule_b"] = self.data["schedule_b"].apply(
+            lambda x: x.ljust(10, "0")
+        )
 
     # Returns a dictionary of schedule_b -> my_plate_category
     def schedule_b_to_category(self):
+        from utils.constants import Constants
 
         schedule_b_data = pd.DataFrame(self.data)
 
@@ -46,28 +32,52 @@ class ConverterUtils:
         return code_to_category
 
     def get_valid_schedule_b_codes(self):
-        return [int(code) for code in self.data["schedule_b"].to_list()]
+        return [code for code in self.data["schedule_b"].to_list()]
 
-    def get_schedule_b_macronutrient_data(self, schedule_b_code: int):
-        index = self.data["schedule_b"] == schedule_b_code
+    def get_schedule_b_macronutrient_data(self, schedule_b_code: str):
+        padded_code = schedule_b_code[:4].ljust(10, "0")
+        index = self.data["schedule_b"] == padded_code
         data = self.data[index]
 
-        return {
-            i: float(data[i].values[0]) for i in get_macronutrients()
-        }
+        if data.empty:
+            return {i: 0 for i in self.get_macronutrients()}
 
-    def get_schedule_b_macronutrient_data_list(self, schedule_b_code_list: list[int]):
+        return {i: float(data[i].values[0]) for i in self.get_macronutrients()}
+
+    def get_schedule_b_macronutrient_data_list(self, schedule_b_code_list: list[str]):
         # Returns a dictionary with each code and the associated macronutrient data
         return {
-            code: self.get_schedule_b_macronutrient_data(code) for code in schedule_b_code_list
+            code: self.get_schedule_b_macronutrient_data(code)
+            for code in schedule_b_code_list
         }
+
+    @staticmethod
+    def get_macronutrients():
+        return [
+            "calories",
+            "total_fat_g",
+            "protein_g",
+            "saturated_fat_g",
+            "cholesterol_mg",
+            "sodium_mg",
+            "carbohydrate_g",
+            "fiber_g",
+            "sugar_g",
+            "vitamin_d_iu",
+            "calcium_mg",
+            "potassium_mg",
+            "iron_mg",
+        ]
 
 
 def main():
-    utils = ConverterUtils('../data/schedule_b_reference.xlsx')
-    # print(utils.get_schedule_b_macronutrient_data(701))
-    print(utils.get_schedule_b_macronutrient_data_list([307, 2209]))
+    from constants import Constants
+
+    utils = ConverterUtils(
+        r"C:\Users\B-400\fsdc-server\data\schedule_b_reference_copy.xlsx"
+    )
+    print(utils.get_schedule_b_macronutrient_data_list(["0203", "2209"]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
