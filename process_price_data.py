@@ -8,13 +8,10 @@ from utils.converter_utils import ConverterUtils
 
 
 def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    # Create ConverterUtils
-    cur_dir = Path(__file__).parent.resolve()
-    reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
-    utils = ConverterUtils(reference_file_path)
-
     # Get i/e price data
     df: pd.DataFrame = DataProcess("data/").process_price().collect().to_pandas()
+
+    print(df.columns)
 
     df1 = df[["hs4", "price_imports"]]
     df1 = (
