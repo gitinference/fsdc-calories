@@ -13,7 +13,7 @@ def process_hts_data() -> pd.DataFrame:
     reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
     utils = ConverterUtils(reference_file_path)
 
-    # Get Import data
+    # Get net hs4 data
     time = "qrt"
     types = "hs"
     df: pd.DataFrame = (
@@ -22,7 +22,7 @@ def process_hts_data() -> pd.DataFrame:
         .collect()
         .to_pandas()
     )
-    df = df[["hs", "year", "qrt", "imports_qty"]]
+    df = df[["hs", "year", "qrt", "net_qty"]]
 
     # Calculate total macronutrients for each valid code
     valid_codes: pd.Series = df["hs"].unique().tolist()
@@ -37,7 +37,7 @@ def process_hts_data() -> pd.DataFrame:
 
     # Calculate the total macronutrients
     for macronutrient in macronutrient_df.columns:
-        df[macronutrient] = df["imports_qty"] * df[macronutrient].fillna(0)
+        df[macronutrient] = df["net_qty"] * df[macronutrient].fillna(0)
 
     def year_quarter_to_datetime(row):
         year = row["year"]
