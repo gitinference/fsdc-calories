@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from jp_imports.data_process import DataProcess
 import pandas as pd
+
+from jp_imports.data_process import DataProcess
 
 from utils.converter_utils import ConverterUtils
 
