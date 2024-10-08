@@ -7,26 +7,6 @@ from jp_imports.data_process import DataProcess
 from utils.converter_utils import ConverterUtils
 
 
-def generate_net_macronutrients_data(
-    import_data: pd.DataFrame, export_data: pd.DataFrame
-) -> pd.DataFrame:
-    # Separate dataframe
-    labels = import_data[["year", "trimester"]]
-
-    # Add year-trimester section for labeling
-    labels["period"] = (
-        labels["year"].apply(lambda x: "Y" + str(x)[-2:]) + labels["trimester"]
-    )
-
-    # Drop from main dataframe
-    data_section_import = import_data.drop(columns=["year", "trimester"])
-    data_section_export = export_data.drop(columns=["year", "trimester"])
-
-    net_dataframe = data_section_import - data_section_export
-    net_dataframe = pd.concat([labels, net_dataframe], axis=1)
-    return net_dataframe
-
-
 def process_hts_data() -> pd.DataFrame:
     # Create ConverterUtils
     cur_dir = Path(__file__).parent.resolve()
