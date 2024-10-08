@@ -19,7 +19,7 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     df1 = df[["hs4", "price_imports"]]
     df1 = (
         df1.groupby(by="hs4")
-        .agg(sum)
+        .agg("sum")
         .sort_values(by="price_imports", ascending=False)
         .reset_index()
     )
@@ -27,7 +27,7 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     df2 = df[["hs4", "price_exports"]]
     df2 = (
         df2.groupby(by="hs4")
-        .agg(sum)
+        .agg("sum")
         .sort_values(by="price_exports", ascending=False)
         .reset_index()
     )
