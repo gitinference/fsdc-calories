@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python
+FROM python:3.10
 
 COPY jp-imports /usr/src/jp-imports
 
