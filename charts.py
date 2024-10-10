@@ -1,9 +1,9 @@
-import plotly.express as px
-import pandas as pd
-
 from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
 from process_energy_data import fetch_energy_data, get_energy_category_map
-from process_fiscal_data import get_net_value_country, get_country_list
+from process_fiscal_data import get_country_list, get_net_value_country
 
 
 def main():
@@ -16,13 +16,20 @@ def get_macronutrient_timeseries_chart_div(category: str):
     df = pd.read_csv(df_path)
 
     # Create figure
-    fig = px.line(df, x="date", y=category)
-    # Set title
-    fig.update_layout(title_text="")
-    # Add range slider
+    fig = px.line(df, x="date", y=category, markers=True)
+
+    # Update layout title and add range slider
     fig.update_layout(
+        title="Net Calories vs Time",
         xaxis=dict(rangeslider=dict(visible=True), type="date"),
     )
+
+    fig.update_traces(
+        line=dict(color="blue", width=2), marker=dict(size=8, color="red")
+    )
+
+    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="LightPink")
+
     div = fig.to_html(
         full_html=False, include_plotlyjs=True, div_id=f"chart_{category}"
     )
