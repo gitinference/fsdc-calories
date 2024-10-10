@@ -20,7 +20,7 @@ def get_macronutrient_timeseries_chart_div(category: str):
 
     # Update layout title and add range slider
     fig.update_layout(
-        title="Net Calories vs Time",
+        title=f"Net {category} vs Time",
         xaxis=dict(rangeslider=dict(visible=True), type="date"),
     )
 
