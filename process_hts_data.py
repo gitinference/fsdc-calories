@@ -22,7 +22,16 @@ def process_hts_data() -> pd.DataFrame:
         .collect()
         .to_pandas()
     )
-    df = df[["hs", "year", "qrt", "net_qty"]]
+    df = df[["hs", "year", "qrt", "imports_qty", "exports_qty"]]
+
+    # Drop rice
+    def is_rice_hs(row):
+        return str(row["hs"]).startswith("1006")
+
+    df = df[df.apply(is_rice_hs, axis=1)]
+
+    # Get net qty (Import - Export)
+    df["net_qty"] = df["imports_qty"] - df["exports_qty"]
 
     # Calculate total macronutrients for each valid code
     valid_codes: pd.Series = df["hs"].unique().tolist()
