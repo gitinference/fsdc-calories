@@ -2,13 +2,13 @@
 
 FROM python
 
-WORKDIR .
+COPY jp-imports /usr/src/jp-imports
 
-COPY requirements.txt requirements.txt
+COPY . /usr/src/app
+
+WORKDIR /usr/src/app
 
 RUN ["pip", "install", "-r", "requirements.txt"]
-
-COPY . .
 
 EXPOSE 80
 
