@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 from process_energy_data import fetch_energy_data, get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
+from process_price_data import get_top_ranking_products_by_year
 
 
 def main():
@@ -73,6 +74,11 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
     )
 
     return div
+
+
+def get_price_ranking_chart_div(year: int, n: int = None):
+    df = get_top_ranking_products_by_year(year, n)
+    pass
 
 
 if __name__ == "__main__":

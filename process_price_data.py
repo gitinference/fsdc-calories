@@ -11,20 +11,25 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Get i/e price data
     df: pd.DataFrame = DataProcess("data/").process_price().collect().to_pandas()
 
-    print(df.columns)
-
     imports = df[["hs4", "year", "price_imports", "imports_qty"]]
+    exports = df[["hs4", "year", "price_exports", "exports_qty"]]
+
+    imports["total_spent_imports"] = imports["price_imports"] * imports["imports_qty"]
+    exports["total_spent_exports"] = exports["price_exports"] * exports["exports_qty"]
+
+    imports = imports[["hs4", "year", "total_spent_imports", "price_imports"]]
+    exports = exports[["hs4", "year", "total_spent_exports", "price_exports"]]
+
     imports = (
         imports.groupby(by=["hs4", "year"])
-        .agg("sum")
+        .agg({"total_spent_imports": "sum", "price_imports": "mean"})
         .sort_values(by="price_imports", ascending=False)
         .reset_index()
     )
 
-    exports = df[["hs4", "year", "price_exports"]]
     exports = (
         exports.groupby(by=["hs4", "year"])
-        .agg("sum")
+        .agg({"total_spent_exports": "sum", "price_exports": "mean"})
         .sort_values(by="price_exports", ascending=False)
         .reset_index()
     )
