@@ -13,25 +13,40 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
 
     print(df.columns)
 
-    df1 = df[["hs4", "price_imports"]]
-    df1 = (
-        df1.groupby(by="hs4")
+    imports = df[["hs4", "year", "price_imports", "imports_qty"]]
+    imports = (
+        imports.groupby(by=["hs4", "year"])
         .agg("sum")
         .sort_values(by="price_imports", ascending=False)
         .reset_index()
     )
 
-    df2 = df[["hs4", "price_exports"]]
-    df2 = (
-        df2.groupby(by="hs4")
+    exports = df[["hs4", "year", "price_exports"]]
+    exports = (
+        exports.groupby(by=["hs4", "year"])
         .agg("sum")
         .sort_values(by="price_exports", ascending=False)
         .reset_index()
     )
 
-    return df1, df2
+    return imports, exports
+
+
+def get_top_ranking_products_by_year(
+    year: int, n: int = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+    imports, exports = proccess_price_data()
+    imports = imports[imports["year"] == year]
+    exports = exports[exports["year"] == year]
+    if n:
+        imports = imports.head(n)
+        exports = exports.head(n)
+
+    return imports, exports
 
 
 if __name__ == "__main__":
-    df1, df2 = proccess_price_data()
-    print(df1, df2)
+    df1, df2 = get_top_ranking_products_by_year(2024, 10)
+    print(df1)
+    print(df2)
