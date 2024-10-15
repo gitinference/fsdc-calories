@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 
@@ -68,6 +70,12 @@ class ConverterUtils:
             "potassium_mg",
             "iron_mg",
         ]
+
+    @staticmethod
+    def get_agriculture_codes():
+        with open("data/external/code_agr.json") as f:
+            d = dict(json.load(f))
+        return list(d.values())
 
 
 def main():
