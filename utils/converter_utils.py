@@ -1,4 +1,5 @@
 import json
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -72,19 +73,16 @@ class ConverterUtils:
         ]
 
     @staticmethod
-    def get_agriculture_codes():
+    def get_agriculture_codes() -> List[str]:
         with open("data/external/code_agr.json") as f:
-            d = dict(json.load(f))
-        return list(d.values())
+            d: dict = dict(json.load(f))
+        agr_codes: List[str] = list(d.values())
+        agr_codes = [str(x).zfill(4) for x in agr_codes]
+        return agr_codes
 
 
 def main():
-    from constants import Constants
-
-    utils = ConverterUtils(
-        r"C:\Users\B-400\fsdc-server\data\schedule_b_reference_copy.xlsx"
-    )
-    print(utils.get_schedule_b_macronutrient_data_list(["0203", "2209"]))
+    pass
 
 
 if __name__ == "__main__":
