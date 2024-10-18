@@ -28,25 +28,36 @@ def process_hts_data() -> pd.DataFrame:
     def is_rice_hs(row):
         return str(row["hs"]).startswith("1006")
 
-    df = df[df.apply(is_rice_hs, axis=1)]
+    rice = df[df.apply(is_rice_hs, axis=1)]
+    df = df.drop(rice.index)
 
     # Get net qty (Import - Export)
     df["net_qty"] = df["imports_qty"] - df["exports_qty"]
 
     # Calculate total macronutrients for each valid code
-    valid_codes: pd.Series = df["hs"].unique().tolist()
+    valid_codes: pd.Series = utils.get_valid_schedule_b_codes()
     all_codes_data: dict = utils.get_schedule_b_macronutrient_data_list(valid_codes)
 
     # Create a DataFrame to hold macronutrient multipliers for each code
     macronutrient_df = pd.DataFrame(all_codes_data).T
-    macronutrient_df.index.name = "hs"  # Set index name to match the 'hs' column in d
+    macronutrient_df.index.name = "hs"  # Set index name to match the 'hs' column in df
 
-    # Merge the original DataFrame with the macronutrient DataFrame
-    df = df.merge(macronutrient_df, on="hs", how="left", suffixes=("", "_mult"))
+    # Create a new column with the first 4 characters of the index in macronutrient_df
+    macronutrient_df["hs4"] = macronutrient_df.index.str[:4]
+
+    # Create a new column with the first 4 characters of 'hs' in df
+    df["hs4"] = df["hs"].str[:4]
+
+    # Perform the merge using the new column
+    df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"))
 
     # Calculate the total macronutrients
-    for macronutrient in macronutrient_df.columns:
-        df[macronutrient] = df["net_qty"] * df[macronutrient].fillna(0)
+    macronutrient_list = list(macronutrient_df.columns)[1:]
+    for m in macronutrient_list:
+        df[m] = df["net_qty"] * df[m].fillna(0.00).astype("Float64")
+
+    # for m in macronutrient_list:
+    #     print(df[m][df[m] > 0])
 
     def year_quarter_to_datetime(row):
         year = row["year"]
