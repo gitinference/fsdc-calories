@@ -76,24 +76,52 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
     return div
 
 
-def get_product_price_ranking_timeseries_div(year: int, n: int = None):
+def get_product_price_ranking_timeseries_div(n: int = None):
     if not n:
         n = 100
 
-    imports, exports = get_top_ranking_products_by_year(year, n)
+    # Fetch imports and exports data for the given year
+    imports, exports = get_top_ranking_products_by_year(n)
 
-    # Create figure
-    fig = px.line(imports, x="year", y="price_imports")
+    # Convert year to datetime if it's not already in the right format
+    if imports["year"].dtype != "datetime64[ns]":
+        imports["year"] = pd.to_datetime(imports["year"], format="%Y")
 
-    # Set title
-    fig.update_layout(title_text="")
+    # Sort data by price_imports to order the hs4 traces by price amount
+    imports.sort_values(by="price_imports", inplace=True, ascending=False)
 
-    # Add range slider
-    fig.update_layout(
-        xaxis=dict(rangeslider=dict(visible=True), type="-"),
+    # Check for and remove any NaN or invalid values
+    imports.dropna(subset=["price_imports", "year"], inplace=True)
+
+    # Create bar chart with hs4 ordered by price_imports
+    fig = px.bar(
+        imports,
+        x="year",
+        y="price_imports",
+        color="hs4",  # This will automatically order the traces by price_imports
+        barmode="stack",  # You can switch to 'stack' if needed
+        hover_data={"hs4": True, "price_imports": ":,.2f"},  # Adding hover info
+        labels={
+            "price_imports": "Import Price (USD)",
+            "year": "Year",
+            "hs4": "Product Code",
+        },
+        title="Product Price Ranking Time Series",
     )
 
-    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"price_chart")
+    # Set title and improve chart layout for better interaction
+    fig.update_layout(
+        xaxis_title="Year",
+        yaxis_title="Import Price (in USD)",
+        xaxis=dict(rangeslider=dict(visible=True), type="date"),  # Enables range slider
+        yaxis=dict(
+            automargin=True,  # Allows for automatic margins
+        ),
+        legend_title_text="Product Code (hs4)",
+    )
+
+    # Generate the HTML div for embedding
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id="price_chart")
 
     return div
 
