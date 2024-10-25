@@ -6,6 +6,7 @@ from charts import (
     get_energy_timeseries_chart_div,
     get_macronutrient_timeseries_chart_div,
     get_fiscal_timeseries_chart_div,
+    get_product_price_ranking_timeseries_div,
 )
 from process_energy_data import get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
@@ -97,9 +98,23 @@ def get_energy_categories():
     return jsonify(get_energy_category_map())
 
 
+""" PRICE ROUTES """
+
+
+@routes.route("/get_price_chart", methods=["GET"])
+def get_price_chart():
+    div = get_product_price_ranking_timeseries_div()
+    return div
+
+
 """ CHART ROUTES """
 
 
 @routes.route("/charts/macronutrients", methods=["GET"])
 def get_macronutrient_chart_render_template():
     return render_template("macronutrient_chart.html")
+
+
+@routes.route("/charts/price_ranking", methods=["GET"])
+def get_price_ranking_chart_render_template():
+    return render_template("product_prices.html")
