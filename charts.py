@@ -76,10 +76,28 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
     return div
 
 
-def get_price_ranking_chart_div(year: int, n: int = None):
-    df = get_top_ranking_products_by_year(year, n)
-    pass
+def get_product_price_ranking_timeseries_div(year: int, n: int = None):
+    if not n:
+        n = 100
+
+    imports, exports = get_top_ranking_products_by_year(year, n)
+
+    # Create figure
+    fig = px.line(imports, x="year", y="price_imports")
+
+    # Set title
+    fig.update_layout(title_text="")
+
+    # Add range slider
+    fig.update_layout(
+        xaxis=dict(rangeslider=dict(visible=True), type="-"),
+    )
+
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"price_chart")
+
+    return div
 
 
 if __name__ == "__main__":
     main()
+    get_product_price_ranking_timeseries_div(2024)
