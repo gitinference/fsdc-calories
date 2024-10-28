@@ -37,21 +37,17 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     return imports, exports
 
 
-def get_top_ranking_products_by_year(
-    year: int, n: int = None
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def save_top_ranking_products(n: int = None) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     imports, exports = proccess_price_data()
-    imports = imports[imports["year"] == year]
-    exports = exports[exports["year"] == year]
+
     if n:
         imports = imports.head(n)
         exports = exports.head(n)
 
-    return imports, exports
+    imports.to_csv("data/prices/yearly_average_price_imports.csv")
+    imports.to_csv("data/prices/yearly_average_price_exports.csv")
 
 
 if __name__ == "__main__":
-    df1, df2 = get_top_ranking_products_by_year(2024, 10)
-    print(df1)
-    print(df2)
+    save_top_ranking_products(2024, 10)
