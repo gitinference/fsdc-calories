@@ -14,6 +14,10 @@ def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     imports = df[["hs4", "year", "price_imports", "imports_qty"]]
     exports = df[["hs4", "year", "price_exports", "exports_qty"]]
 
+    # Drop rows that are not agricultural
+    imports = imports[imports.hs4.isin(ConverterUtils.get_agriculture_codes()) == True]
+    exports = exports[exports.hs4.isin(ConverterUtils.get_agriculture_codes()) == True]
+
     imports["total_spent_imports"] = imports["price_imports"] * imports["imports_qty"]
     exports["total_spent_exports"] = exports["price_exports"] * exports["exports_qty"]
 
@@ -50,4 +54,4 @@ def save_top_ranking_products(n: int = None) -> tuple[pd.DataFrame, pd.DataFrame
 
 
 if __name__ == "__main__":
-    save_top_ranking_products(2024, 10)
+    save_top_ranking_products()
