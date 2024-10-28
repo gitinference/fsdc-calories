@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Set
 
 import numpy as np
 import pandas as pd
@@ -73,12 +73,12 @@ class ConverterUtils:
         ]
 
     @staticmethod
-    def get_agriculture_codes() -> List[str]:
+    def get_agriculture_codes() -> Set[str]:
         with open("data/external/code_agr.json") as f:
             d: dict = dict(json.load(f))
         agr_codes: List[str] = list(d.values())
         agr_codes = [str(x).zfill(4) for x in agr_codes]
-        return agr_codes
+        return set(agr_codes)
 
 
 def main():
