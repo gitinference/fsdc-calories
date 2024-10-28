@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 from process_energy_data import fetch_energy_data, get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
-from process_price_data import get_top_ranking_products_by_year
+from process_price_data import save_top_ranking_products
 
 
 def main():
@@ -81,7 +81,7 @@ def get_product_price_ranking_timeseries_div(n: int = None):
         n = 100
 
     # Fetch imports and exports data for the given year
-    imports, exports = get_top_ranking_products_by_year(n)
+    imports, exports = save_top_ranking_products(n)
 
     # Convert year to datetime if it's not already in the right format
     if imports["year"].dtype != "datetime64[ns]":
