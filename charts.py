@@ -81,7 +81,17 @@ def get_product_price_ranking_timeseries_div(n: int = None):
         n = 100
 
     # Fetch imports and exports data for the given year
-    imports, exports = save_top_ranking_products(n)
+    # imports, exports = save_top_ranking_products(n)
+    imports = pd.read_csv("data/prices/yearly_average_price_imports.csv")
+    exports = pd.read_csv("data/prices/yearly_average_price_exports.csv")
+
+    # Fix hs4 column being treated as int
+    imports["hs4"] = imports["hs4"].astype(str)
+    exports["hs4"] = exports["hs4"].astype(str)
+
+    # Make hs4 to 4 characters
+    imports["hs4"] = imports["hs4"].apply(lambda x: str(x).zfill(4))
+    exports["hs4"] = exports["hs4"].apply(lambda x: str(x).zfill(4))
 
     # Convert year to datetime if it's not already in the right format
     if imports["year"].dtype != "datetime64[ns]":
