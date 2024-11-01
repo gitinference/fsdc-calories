@@ -1,56 +1,69 @@
-from pathlib import Path
-
+from datetime import datetime
 import pandas as pd
-
-from jp_imports.data_process import DataProcess
-
+import requests
 from utils.converter_utils import ConverterUtils
 
 
 def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Get i/e price data
-    df: pd.DataFrame = DataProcess("data/").process_price().collect().to_pandas()
-
-    imports = df[["hs4", "year", "price_imports", "imports_qty"]]
-    exports = df[["hs4", "year", "price_exports", "exports_qty"]]
+    # res = requests.get("https://api.econlabs.net/data/tade/moving")
+    # if not res:
+    #     raise Exception("Could not get data from econlabs.")
+    
+    df: pd.DataFrame = pd.read_csv("data/prices/raw.csv")
+    
+    df["hs4"] = df["hs4"].astype(str)
+    df["date"] = pd.to_datetime(df["date"])
+    
+    # Separate data for imports and exports
+    imports = df[["hs4", "date", "prev_year_imports"]]
+    exports = df[["hs4", "date", "prev_year_exports"]]
 
     # Drop rows that are not agricultural
-    imports = imports[imports.hs4.isin(ConverterUtils.get_agriculture_codes()) == True]
-    exports = exports[exports.hs4.isin(ConverterUtils.get_agriculture_codes()) == True]
-
-    imports["total_spent_imports"] = imports["price_imports"] * imports["imports_qty"]
-    exports["total_spent_exports"] = exports["price_exports"] * exports["exports_qty"]
-
-    imports = imports[["hs4", "year", "total_spent_imports", "price_imports"]]
-    exports = exports[["hs4", "year", "total_spent_exports", "price_exports"]]
-
-    imports = (
-        imports.groupby(by=["hs4", "year"])
-        .agg({"total_spent_imports": "sum", "price_imports": "mean"})
-        .sort_values(by="price_imports", ascending=False)
-        .reset_index()
-    )
-
-    exports = (
-        exports.groupby(by=["hs4", "year"])
-        .agg({"total_spent_exports": "sum", "price_exports": "mean"})
-        .sort_values(by="price_exports", ascending=False)
-        .reset_index()
-    )
+    imports = imports[imports.hs4.isin(ConverterUtils.get_agriculture_codes())]
+    exports = exports[exports.hs4.isin(ConverterUtils.get_agriculture_codes())]
 
     return imports, exports
 
 
-def save_top_ranking_products(n: int = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-
+def save_top_ranking_products() -> tuple[pd.DataFrame, pd.DataFrame]:
     imports, exports = proccess_price_data()
 
-    if n:
-        imports = imports.head(n)
-        exports = exports.head(n)
+    # Get current month and year
+    current_month = datetime.now().month
+    current_year = datetime.now().year
 
-    imports.to_csv("data/prices/yearly_average_price_imports.csv")
-    imports.to_csv("data/prices/yearly_average_price_exports.csv")
+    # Calculate previous month and handle year wrap
+    if current_month == 1:
+        previous_month = 12
+        previous_year = current_year - 1
+    else:
+        previous_month = current_month - 1
+        previous_year = current_year
+    
+    # Handle case where latest available data is older than last month
+    max_month_available = imports["date"].max().month
+    previous_month = min(max_month_available, previous_month)
+
+    month_year_filter_imports = (imports['date'].dt.month == previous_month) & (imports['date'].dt.year == previous_year)
+    month_year_filter_exports = (exports['date'].dt.month == previous_month) & (exports['date'].dt.year == previous_year)
+
+    imports = imports[month_year_filter_imports]
+    exports = exports[month_year_filter_exports]
+
+    imports = imports.sort_values(by="prev_year_imports", ascending=False)
+    exports = exports.sort_values(by="prev_year_exports", ascending=False)
+    
+    rename_map = {"prev_year_imports": "pct_change_moving_price", "prev_year_exports": "pct_change_moving_price"}
+    
+    imports.rename(rename_map)
+    exports.rename(rename_map)
+
+    # Save results for debugging purposes
+    imports.to_csv("data/prices/price_imports.csv", index=False)
+    exports.to_csv("data/prices/price_exports.csv", index=False)
+
+    return imports, exports
 
 
 if __name__ == "__main__":
