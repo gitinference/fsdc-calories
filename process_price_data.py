@@ -56,8 +56,8 @@ def save_top_ranking_products() -> tuple[pd.DataFrame, pd.DataFrame]:
     
     rename_map = {"prev_year_imports": "pct_change_moving_price", "prev_year_exports": "pct_change_moving_price"}
     
-    imports.rename(rename_map)
-    exports.rename(rename_map)
+    imports = imports.rename(columns=rename_map)
+    exports = exports.rename(columns=rename_map)
 
     # Save results for debugging purposes
     imports.to_csv("data/prices/price_imports.csv", index=False)

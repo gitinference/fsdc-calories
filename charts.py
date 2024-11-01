@@ -75,47 +75,49 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
 
 
 def get_product_price_ranking_timeseries_div():
-
-    # Generate and load the imports and exports data for the given year
+    # Load the imports and exports data
     if not os.path.exists("data/prices/price_imports.csv"):
         save_top_ranking_products()
 
     imports = pd.read_csv("data/prices/price_imports.csv")
     exports = pd.read_csv("data/prices/price_exports.csv")
 
-    # Ensure hs4 column is treated as a string and has 4 characters
+    # Ensure hs4 column is treated as a string
     imports["hs4"] = imports["hs4"].astype(str)
     exports["hs4"] = exports["hs4"].astype(str)
 
     # Create figure with two bar traces
     fig = go.Figure()
 
-    # Positive values bar trace
-    fig.add_trace(
-        go.Bar(
-            x=imports["date"],
-            y=imports["pct_change_moving_price"],
-            name="Positive Change",
-            marker=dict(color="blue"),
-            hoverinfo="text",
-            text=imports.apply(
-                lambda row: f"Product: {row['hs4']}<br>YoY % Change: {row['yoy_pct_change_imports']:.2f}",
-                axis=1,
-            ),
-        )
-    )
+    # Add a bar trace for the imports with hover labels
+    fig.add_trace(go.Bar(
+        x=imports['hs4'],
+        y=imports['pct_change_moving_price'],
+        name='Imports Price Change',
+        marker_color='blue',
+        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
+                      'Price Change: %{y:.2f} %<br>' +
+                      '<extra></extra>'  # Remove the secondary info (trace name)
+    ))
 
-    # Set up layout with range slider, axis labels, and zero line
+    # Optionally, add a trace for exports with hover labels
+    fig.add_trace(go.Bar(
+        x=exports['hs4'],
+        y=exports['pct_change_moving_price'],
+        name='Exports Price Change',
+        marker_color='orange',
+        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
+                      'Price Change: %{y:.2f} %<br>' +
+                      '<extra></extra>'  # Remove the secondary info (trace name)
+    ))
+
+    # Update layout
     fig.update_layout(
-        title="Product Moving Price YoY % Change",
-        xaxis_title="Date",
-        yaxis_title="YoY % Change in Price",
-        barmode="relative",  # Maintain relative stacking for clarity
-        xaxis=dict(rangeslider=dict(visible=True), type="date"),
-        yaxis=dict(
-            automargin=True,  # Allows for automatic margins
-        ),
-        legend_title_text="Product Code (hs4)",
+        title='Price Change by HS4 Code',
+        xaxis_title='HS4 Code',
+        yaxis_title='Percentage Change in Price',
+        barmode='group',
+        xaxis_tickangle=-45  # Rotate x-axis labels for better readability
     )
 
     # Generate the HTML div for embedding
