@@ -1,104 +1,141 @@
-import os
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+from process_energy_data import fetch_energy_data, get_energy_category_map
+from process_fiscal_data import get_country_list, get_net_value_country
 from process_price_data import save_top_ranking_products
+
+
+def main():
+    pass
+
+
+def get_macronutrient_timeseries_chart_div(category: str):
+    cur_dir = Path(__file__).parent.resolve()
+    df_path = str(cur_dir / "data" / "macronutrients" / "net_macronutrients.csv")
+    df = pd.read_csv(df_path)
+
+    # Create figure
+    fig = px.line(df, x="date", y=category, markers=True)
+
+    # Update layout title and add range slider
+    fig.update_layout(
+        title=f"Net {category} vs Time",
+        xaxis=dict(rangeslider=dict(visible=True), type="date"),
+    )
+
+    fig.update_traces(
+        line=dict(color="blue", width=2), marker=dict(size=8, color="red")
+    )
+
+    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="LightPink")
+
+    div = fig.to_html(
+        full_html=False, include_plotlyjs=True, div_id=f"chart_{category}"
+    )
+    return div
+
+
+def get_fiscal_timeseries_chart_div(country: str):
+    df = get_net_value_country(country)
+
+    # Create figure
+    fig = px.line(df, x="Fiscal Year", y="net_value")
+    # Set title
+    fig.update_layout(title_text=f"{country} Net Value Products")
+    # Add range slider
+    fig.update_layout(
+        xaxis=dict(rangeslider=dict(visible=True), type="-"),
+    )
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id=f"chart_{country}")
+    return div
+
+
+def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mkwh"):
+    df = fetch_energy_data()
+
+    agricultural_categories_dict = get_energy_category_map()
+    selected_category_col_name = agricultural_categories_dict[category]
+
+    # Create figure
+    fig = px.line(df, x="Date", y=selected_category_col_name)
+
+    # Set title
+    fig.update_layout(title_text="")
+
+    # Add range slider
+    fig.update_layout(
+        xaxis=dict(rangeslider=dict(visible=True), type="date"),
+    )
+
+    div = fig.to_html(
+        full_html=False, include_plotlyjs=True, div_id=f"chart_{category}"
+    )
+
+    return div
 
 
 def get_product_price_ranking_timeseries_div(n: int = None):
     if not n:
         n = 100
 
-    # Generate and load the imports and exports data for the given year
-    if not os.path.exists("data/prices/yearly_average_price_imports.csv"):
-        save_top_ranking_products(n)
-
+    # Fetch imports and exports data for the given year
+    # imports, exports = save_top_ranking_products(n)
     imports = pd.read_csv("data/prices/yearly_average_price_imports.csv")
     exports = pd.read_csv("data/prices/yearly_average_price_exports.csv")
 
-    # Ensure hs4 column is treated as a string and has 4 characters
-    imports["hs4"] = imports["hs4"].astype(str).apply(lambda x: x.zfill(4))
-    exports["hs4"] = exports["hs4"].astype(str).apply(lambda x: x.zfill(4))
+    # Fix hs4 column being treated as int
+    imports["hs4"] = imports["hs4"].astype(str)
+    exports["hs4"] = exports["hs4"].astype(str)
 
-    # Map each trimester to a month
-    trimester_to_month = {1: "01", 2: "04", 3: "07", 4: "10"}
+    # Make hs4 to 4 characters
+    imports["hs4"] = imports["hs4"].apply(lambda x: str(x).zfill(4))
+    exports["hs4"] = exports["hs4"].apply(lambda x: str(x).zfill(4))
 
-    # Create a synthetic date column based on year and trimester
-    imports["date"] = pd.to_datetime(
-        imports["year"].astype(str)
-        + "-"
-        + imports["trimester"].map(trimester_to_month)
-        + "-01"
-    )
-    exports["date"] = pd.to_datetime(
-        exports["year"].astype(str)
-        + "-"
-        + exports["trimester"].map(trimester_to_month)
-        + "-01"
-    )
+    # Convert year to datetime if it's not already in the right format
+    if imports["year"].dtype != "datetime64[ns]":
+        imports["year"] = pd.to_datetime(imports["year"], format="%Y")
 
-    # Sort data by YoY percentage change in imports for display purposes
-    imports.sort_values(by="yoy_pct_change_imports", inplace=True, ascending=False)
+    # Sort data by price_imports to order the hs4 traces by price amount
+    imports.sort_values(by="price_imports", inplace=True, ascending=False)
 
-    # Remove rows with NaN values in YoY percentage change or date column
-    imports.dropna(subset=["yoy_pct_change_imports", "date"], inplace=True)
+    # Check for and remove any NaN or invalid values
+    imports.dropna(subset=["price_imports", "year"], inplace=True)
 
-    # Separate positive and negative YoY percentage change values for better color control
-    positive_changes = imports[imports["yoy_pct_change_imports"] >= 0]
-    negative_changes = imports[imports["yoy_pct_change_imports"] < 0]
-
-    # Create figure with two bar traces
-    fig = go.Figure()
-
-    # Positive values bar trace
-    fig.add_trace(
-        go.Bar(
-            x=positive_changes["date"],
-            y=positive_changes["yoy_pct_change_imports"],
-            name="Positive Change",
-            marker=dict(color="blue"),
-            hoverinfo="text",
-            text=positive_changes.apply(
-                lambda row: f"Product: {row['hs4']}<br>YoY % Change: {row['yoy_pct_change_imports']:.2f}",
-                axis=1,
-            ),
-        )
+    # Create bar chart with hs4 ordered by price_imports
+    fig = px.bar(
+        imports,
+        x="year",
+        y="price_imports",
+        color="hs4",  # This will automatically order the traces by price_imports
+        barmode="stack",  # You can switch to 'stack' if needed
+        hover_data={"hs4": True, "price_imports": ":,.2f"},  # Adding hover info
+        labels={
+            "price_imports": "Import Price (USD)",
+            "year": "Year",
+            "hs4": "Product Code",
+        },
+        title="Product Price Ranking Time Series",
     )
 
-    # Negative values bar trace
-    fig.add_trace(
-        go.Bar(
-            x=negative_changes["date"],
-            y=negative_changes["yoy_pct_change_imports"],
-            name="Negative Change",
-            marker=dict(color="red"),
-            hoverinfo="text",
-            text=negative_changes.apply(
-                lambda row: f"Product: {row['hs4']}<br>YoY % Change: {row['yoy_pct_change_imports']:.2f}",
-                axis=1,
-            ),
-        )
-    )
-
-    # Set up layout with range slider, axis labels, and zero line
+    # Set title and improve chart layout for better interaction
     fig.update_layout(
-        title="Product Import Price YoY % Change by Trimester",
-        xaxis_title="Date",
-        yaxis_title="YoY % Change in Import Price",
-        barmode="relative",  # Maintain relative stacking for clarity
-        xaxis=dict(rangeslider=dict(visible=True), type="date"),
+        xaxis_title="Year",
+        yaxis_title="Import Price (in USD)",
+        xaxis=dict(rangeslider=dict(visible=True), type="date"),  # Enables range slider
         yaxis=dict(
-            automargin=True,
-            zeroline=True,  # Draw a line at y=0
-            zerolinewidth=2,
-            zerolinecolor="black",
+            automargin=True,  # Allows for automatic margins
         ),
-        legend_title_text="Change Type",
+        legend_title_text="Product Code (hs4)",
     )
 
-    # Generate HTML div for embedding
+    # Generate the HTML div for embedding
     div = fig.to_html(full_html=False, include_plotlyjs=True, div_id="price_chart")
 
     return div
+
+
+if __name__ == "__main__":
+    main()
+    get_product_price_ranking_timeseries_div(2024)
