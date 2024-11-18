@@ -1,13 +1,12 @@
 from pathlib import Path
 
+import os
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from process_energy_data import fetch_energy_data, get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
-
-
-def main():
-    pass
+from process_price_data import save_top_ranking_products
 
 
 def get_macronutrient_timeseries_chart_div(category: str):
@@ -75,5 +74,57 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
     return div
 
 
+def get_product_price_ranking_timeseries_div():
+    # Load the imports and exports data
+    if not os.path.exists("data/prices/price_imports.csv"):
+        save_top_ranking_products()
+
+    imports = pd.read_csv("data/prices/price_imports.csv")
+    exports = pd.read_csv("data/prices/price_exports.csv")
+
+    # Ensure hs4 column is treated as a string
+    imports["hs4"] = imports["hs4"].astype(str)
+    exports["hs4"] = exports["hs4"].astype(str)
+
+    # Create figure with two bar traces
+    fig = go.Figure()
+
+    # Add a bar trace for the imports with hover labels
+    fig.add_trace(go.Bar(
+        x=imports['hs4'],
+        y=imports['pct_change_moving_price'],
+        name='Imports Price Change',
+        marker_color='blue',
+        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
+                      'Price Change: %{y:.2f} %<br>' +
+                      '<extra></extra>'  # Remove the secondary info (trace name)
+    ))
+
+    # Optionally, add a trace for exports with hover labels
+    fig.add_trace(go.Bar(
+        x=exports['hs4'],
+        y=exports['pct_change_moving_price'],
+        name='Exports Price Change',
+        marker_color='orange',
+        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
+                      'Price Change: %{y:.2f} %<br>' +
+                      '<extra></extra>'  # Remove the secondary info (trace name)
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title='Price Change by HS4 Code',
+        xaxis_title='HS4 Code',
+        yaxis_title='Percentage Change in Price',
+        barmode='group',
+        xaxis_tickangle=-45  # Rotate x-axis labels for better readability
+    )
+
+    # Generate the HTML div for embedding
+    div = fig.to_html(full_html=False, include_plotlyjs=True, div_id="price_chart")
+
+    return div
+
+
 if __name__ == "__main__":
-    main()
+    get_product_price_ranking_timeseries_div()

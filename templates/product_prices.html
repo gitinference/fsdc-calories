@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Price Chart</title>
+</head>
+
+<body>
+    <div id="price-chart-container"></div>
+
+    <script>
+        // Get the current hostname
+        var currentHost = window.location.hostname;
+        console.log(currentHost);
+        let baseUrl = "";
+        
+        // Define the base URL based on the current host
+        if (currentHost === 'localhost') {
+            baseUrl = 'http://localhost:5000';
+        } else if (currentHost === 'www.uprm.edu') {
+            baseUrl = "https://fsdcbackend.ddns.net";
+        }
+
+        async function fetchPriceChart() {
+            const fetchUrl = new URL("get_price_chart", baseUrl);
+            
+            // Set initial innerHTML to "Loading"
+            const container_div = document.getElementById("price-chart-container");
+            container_div.innerHTML = "<h1>Loading...</h1>";
+            
+            // Fetch the price chart HTML (assumed Plotly div)
+            container_div.innerHTML = await fetch(fetchUrl).then(res => res.text());
+
+            // Re-render any necessary scripts for Plotly or other libraries
+            const scripts = container_div.getElementsByTagName('script');
+            for (let script of scripts) {
+                eval(script.innerHTML); // Evaluate inline scripts for Plotly
+            }
+        }
+
+        // Call the function to fetch and display the chart on page load
+        fetchPriceChart();
+    </script>
+
+</body>
+
+</html>
