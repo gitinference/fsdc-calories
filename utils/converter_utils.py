@@ -28,7 +28,11 @@ class ConverterUtils:
         code_to_category = dict()
         row: pd.Series
         for index, row in schedule_b_data.iterrows():
-            current_category = row[row == 1].index[0]
+            try:
+                current_category = row[row == 1].index[0]
+            except:
+                code_to_category[row["schedule_b"]] = "other"
+                continue
             if current_category in Constants.get_food_categories():
                 code_to_category[row["schedule_b"]] = current_category
 

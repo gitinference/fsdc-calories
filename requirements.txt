@@ -19,7 +19,7 @@ h11==0.14.0
 idna==3.8
 itsdangerous==2.2.0
 Jinja2==3.1.4
--e ./jp-imports
+# -e ./jp-imports
 kiwisolver==1.4.7
 MarkupSafe==2.1.5
 matplotlib==3.9.2

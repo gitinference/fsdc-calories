@@ -1,8 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
-
-from jp_imports.data_process import DataProcess
+import requests
 
 from utils.converter_utils import ConverterUtils
 
@@ -14,25 +13,28 @@ def process_hts_data() -> pd.DataFrame:
     utils = ConverterUtils(reference_file_path)
 
     # Get net hs4 data
-    time = "qrt"
-    types = "hs"
-    df: pd.DataFrame = (
-        DataProcess("data/")
-        .process_int_org(time, types, agr=True)
-        .collect()
-        .to_pandas()
-    )
-    df = df[["hs", "year", "qrt", "imports_qty", "exports_qty"]]
+    # time = "qrt"
+    # types = "hs"
+    # df: pd.DataFrame = (
+    #     DataProcess("data/")
+    #     .process_int_org(time, types, agr=True)
+    #     .collect()
+    #     .to_pandas()
+    # )
+    
+    response = requests.get("https://api.econlabs.net/data/trade/org/?time=qrt&types=hts&agr=true&group=false")
+    df = pd.DataFrame(response.json())
+    df = df[["hts_code", "year", "qrt", "qty_imports", "qty_exports"]]
 
     # Drop rice
     def is_rice_hs(row):
-        return str(row["hs"]).startswith("1006")
+        return str(row["hts_code"]).startswith("1006")
 
     rice = df[df.apply(is_rice_hs, axis=1)]
     df = df.drop(rice.index)
 
     # Get net qty (Import - Export)
-    df["net_qty"] = df["imports_qty"] - df["exports_qty"]
+    df["net_qty"] = df["qty_imports"] - df["qty_exports"]
 
     # Calculate total macronutrients for each valid code
     valid_codes: pd.Series = utils.get_valid_schedule_b_codes()
@@ -40,13 +42,13 @@ def process_hts_data() -> pd.DataFrame:
 
     # Create a DataFrame to hold macronutrient multipliers for each code
     macronutrient_df = pd.DataFrame(all_codes_data).T
-    macronutrient_df.index.name = "hs"  # Set index name to match the 'hs' column in df
+    macronutrient_df.index.name = "hts_code"  # Set index name to match the 'hs' column in df
 
     # Create a new column with the first 4 characters of the index in macronutrient_df
     macronutrient_df["hs4"] = macronutrient_df.index.str[:4]
 
     # Create a new column with the first 4 characters of 'hs' in df
-    df["hs4"] = df["hs"].str[:4]
+    df["hs4"] = df["hts_code"].str[:4]
 
     # Perform the merge using the new column
     df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"))
