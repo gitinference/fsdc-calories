@@ -9,21 +9,9 @@ from utils.converter_utils import ConverterUtils
 
 def process_plate_data():
     # Data paths
-
     schedule_b_reference_path = "data/schedule_b_reference.xlsx"
-    response = requests.get(
-        "https://api.econlabs.net/data/trade/org/?time=monthly&types=hts&agr=true&group=false"
-    )
-    df = pd.DataFrame(response.json())
-    print(df)
-    hts_data = df
-
-    # Cleans HTS code to n figures, removes apostrophe at start of code (ex. clean('010287, 4) => 0102)
-
-    # def clean_hts_value(hts_value, figures=4):
-    #     return int(hts_value[1 : figures + 1])
-
-    # hts_data["hts_code"] = hts_data["hts_code"].apply(clean_hts_value)
+    hts_data = pd.read_csv("data/plate/raw_plate.csv")
+    hts_data["hts_code"] = hts_data["hts_code"].astype(str)
 
     utils = ConverterUtils(schedule_b_reference_path)
     code_to_category = utils.schedule_b_to_category()

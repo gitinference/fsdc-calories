@@ -11,20 +11,9 @@ def process_hts_data() -> pd.DataFrame:
     cur_dir = Path(__file__).parent.resolve()
     reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
     utils = ConverterUtils(reference_file_path)
-
-    # Get net hs4 data
-    # time = "qrt"
-    # types = "hs"
-    # df: pd.DataFrame = (
-    #     DataProcess("data/")
-    #     .process_int_org(time, types, agr=True)
-    #     .collect()
-    #     .to_pandas()
-    # )
     
-    response = requests.get("https://api.econlabs.net/data/trade/org/?time=qrt&types=hts&agr=true&group=false")
-    df = pd.DataFrame(response.json())
-    df = df[["hts_code", "year", "qrt", "qty_imports", "qty_exports"]]
+    df = pd.read_csv("data/macronutrients/raw_macro.csv")
+    df["hts_code"] = df["hts_code"].astype(str)
 
     # Drop rice
     def is_rice_hs(row):
@@ -82,6 +71,8 @@ def process_hts_data() -> pd.DataFrame:
     df["date"] = df["date"] = df.apply(year_quarter_to_datetime, axis=1)
     grouped_df = df.groupby("date").agg("sum").reset_index()
     final_columns = ["date"] + utils.get_macronutrients()
+    
+    grouped_df[final_columns].to_csv("data/macronutrients/net_macronutrients.csv")
     return grouped_df[final_columns]
 
 
