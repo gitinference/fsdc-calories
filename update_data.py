@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import requests
 
+from process_energy_data import fetch_energy_data
 from process_hts_data import process_hts_data
 from process_plate_data import process_plate_data
 from process_price_data import save_top_ranking_products
@@ -17,7 +18,7 @@ def update_data():
     # Pull macronutrient data from API and process
 
     response = requests.get(
-        "https://api.econlabs.net/data/trade/org/?time=qrt&types=hts&agr=true&group=false"
+        "https://api.econlabs.net/data/trade/org/?agg=qrt&types=hts&agr=true"
     )
     df = pd.DataFrame(response.json())
     df = df[["hts_code", "year", "qrt", "qty_imports", "qty_exports"]]
@@ -27,7 +28,7 @@ def update_data():
     # Pull plate data
 
     response = requests.get(
-        "https://api.econlabs.net/data/trade/org/?time=monthly&types=hts&agr=true&group=false"
+        "https://api.econlabs.net/data/trade/org/?agg=monthly&types=hts&agr=true"
     )
     df = pd.DataFrame(response.json())
     df.to_csv("data/plate/raw_plate.csv")
@@ -41,6 +42,10 @@ def update_data():
     df = pd.DataFrame(response.json())
     df.to_csv("data/prices/raw_prices.csv")
     save_top_ranking_products()
+    
+    # Pull energy data
+    df = fetch_energy_data()
+    df.to_csv("data/energy/processed_energy_data.csv")
     
     
 
