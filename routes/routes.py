@@ -118,3 +118,7 @@ def get_macronutrient_chart_render_template():
 @routes.route("/charts/price_ranking", methods=["GET"])
 def get_price_ranking_chart_render_template():
     return render_template("product_prices.html")
+
+@routes.route("/charts/energy", methods=["GET"])
+def get_energy_indices_chart_render_template():
+    return render_template("energy_chart.html")
