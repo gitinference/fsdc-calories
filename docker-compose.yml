@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: flask.Dockerfile
     command: gunicorn main:app --bind 0.0.0.0:80
+    ports: 
+      - 5347:80
 #     networks:
 #       - nginx_network
     
