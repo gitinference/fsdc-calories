@@ -3,19 +3,19 @@ services:
     build:
       context: .
       dockerfile: flask.Dockerfile
-    command: gunicorn main:app --bind :80
+    command: gunicorn main:app --bind :5347
     networks:
       - nginx_network
     
   nginx:
     image: nginx
     ports:
-      - 80:80
-      - 443:443
+      - 5347:5347
+      # - 443:443
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
-      - /etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem/
-      - /etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem
+      # - /etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/fullchain.pem/
+      # - /etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem:/etc/letsencrypt/live/fsdcbackend.ddns.net/privkey.pem
     depends_on:
       - web
     networks:
