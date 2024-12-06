@@ -51,8 +51,8 @@ def get_fiscal_timeseries_chart_div(country: str):
 
 
 def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mkwh"):
-    df = fetch_energy_data()
-
+    df = pd.read_csv("data/energy/processed_energy_data.csv")
+    
     agricultural_categories_dict = get_energy_category_map()
     selected_category_col_name = agricultural_categories_dict[category]
 
