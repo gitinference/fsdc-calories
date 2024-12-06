@@ -18,9 +18,9 @@
         // Define the base URL based on the current host
         if (currentHost === 'localhost') {
             baseUrl = 'http://localhost:5000';
-        } else if (currentHost === 'www.uprm.edu') {
-            baseUrl = "https://fsdcbackend.ddns.net";
-        }
+          } else if (currentHost === 'www.uprm.edu') {
+            baseUrl = "https://fsdc.econlabs.net"
+          }
 
         async function fetchPriceChart() {
             const fetchUrl = new URL("get_price_chart", baseUrl);
