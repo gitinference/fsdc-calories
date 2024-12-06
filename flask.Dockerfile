@@ -2,8 +2,6 @@
 
 FROM python:3.10
 
-COPY jp-imports /usr/src/jp-imports
-
 COPY . /usr/src/app
 
 WORKDIR /usr/src/app
