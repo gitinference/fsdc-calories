@@ -40,7 +40,7 @@ def process_hts_data() -> pd.DataFrame:
     df["hs4"] = df["hts_code"].str[:4]
     
     # Group by hs4
-    df = df.groupby(by="hs4").agg("sum").reset_index()
+    df = df.groupby(by=["hs4", "year", "qrt"]).agg("sum").reset_index()
 
     # Perform the merge using the new column
     df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"), validate="many_to_one")
@@ -63,7 +63,7 @@ def process_hts_data() -> pd.DataFrame:
         elif quarter == 4:
             month = 10
         else:
-            raise ValueError("Quarter must be between 1 and 4")
+            raise ValueError(f"Quarter must be between 1 and 4, got {quarter}")
 
         # Create the datetime object for the first day of the quarter
         return pd.Timestamp(year=year, month=month, day=1)
