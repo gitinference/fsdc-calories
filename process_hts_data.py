@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-import requests
 
 from utils.converter_utils import ConverterUtils
 
@@ -32,6 +31,15 @@ def process_hts_data() -> pd.DataFrame:
     # Create a DataFrame to hold macronutrient multipliers for each code
     macronutrient_df = pd.DataFrame(all_codes_data).T
     macronutrient_df.index.name = "hts_code"  # Set index name to match the 'hs' column in df
+    
+    # Convert each multiplier to kilograms
+    for m in ConverterUtils.get_macronutrients():
+        if "mg" in m:
+            macronutrient_df[m] = macronutrient_df[m] / 1000000
+        elif "g" in m:
+            macronutrient_df[m] = macronutrient_df[m] / 1000
+        else:
+            print(f"Unit for {m} not found. Assuming kilograms...")
 
     # Create a new column with the first 4 characters of the index in macronutrient_df
     macronutrient_df["hs4"] = macronutrient_df.index.str[:4]
@@ -41,12 +49,16 @@ def process_hts_data() -> pd.DataFrame:
     
     # Group by hs4
     df = df.groupby(by=["hs4", "year", "qrt"]).agg("sum").reset_index()
+    
+    # FIX: Drop Otas and Rice
+    df = df[(df["hs4"] != "1004") & (df["hs4"] != "1006")]
 
     # Perform the merge using the new column
     df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"), validate="many_to_one")
 
     # Calculate the total macronutrients
-    macronutrient_list = list(macronutrient_df.columns)[1:]
+    macronutrient_list = ConverterUtils.get_macronutrients()
+    
     for m in macronutrient_list:
         df[m] = df["net_qty"] * df[m].fillna(0.00).astype("Float64")
 
