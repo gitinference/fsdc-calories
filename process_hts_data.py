@@ -38,17 +38,17 @@ def process_hts_data() -> pd.DataFrame:
 
     # Create a new column with the first 4 characters of 'hs' in df
     df["hs4"] = df["hts_code"].str[:4]
+    
+    # Group by hs4
+    df = df.groupby(by="hs4").agg("sum").reset_index()
 
     # Perform the merge using the new column
-    df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"))
+    df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"), validate="many_to_one")
 
     # Calculate the total macronutrients
     macronutrient_list = list(macronutrient_df.columns)[1:]
     for m in macronutrient_list:
         df[m] = df["net_qty"] * df[m].fillna(0.00).astype("Float64")
-
-    # for m in macronutrient_list:
-    #     print(df[m][df[m] > 0])
 
     def year_quarter_to_datetime(row):
         year = row["year"]
