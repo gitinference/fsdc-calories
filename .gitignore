@@ -254,3 +254,4 @@ chromedriver
 data/external
 data/raw
 .vscode
+.python-version
