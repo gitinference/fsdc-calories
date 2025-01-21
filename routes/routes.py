@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, json, jsonify, render_template, request
-
 from charts import (
     get_energy_timeseries_chart_div,
-    get_macronutrient_timeseries_chart_div,
     get_fiscal_timeseries_chart_div,
+    get_macronutrient_timeseries_chart_div,
     get_product_price_ranking_timeseries_div,
 )
+
+from flask import abort, Blueprint, current_app, json, jsonify, render_template, request
 from process_energy_data import get_energy_category_map
 from process_fiscal_data import get_country_list, get_net_value_country
 from utils.converter_utils import ConverterUtils
@@ -110,6 +110,11 @@ def get_price_chart():
 """ CHART ROUTES """
 
 
+@routes.route("/charts", methods=["GET"])
+def get_all_charts_render_template():
+    return render_template("charts.html")
+
+
 @routes.route("/charts/macronutrients", methods=["GET"])
 def get_macronutrient_chart_render_template():
     return render_template("macronutrient_chart.html")
@@ -119,6 +124,12 @@ def get_macronutrient_chart_render_template():
 def get_price_ranking_chart_render_template():
     return render_template("product_prices.html")
 
+
 @routes.route("/charts/energy", methods=["GET"])
 def get_energy_indices_chart_render_template():
     return render_template("energy_chart.html")
+
+
+@routes.route("/charts/plate", methods=["GET"])
+def get_plate_chart_render_template():
+    return render_template("my_plate.html")
