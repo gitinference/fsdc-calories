@@ -10,7 +10,7 @@ def process_hts_data() -> pd.DataFrame:
     cur_dir = Path(__file__).parent.resolve()
     reference_file_path = str(cur_dir / "data" / "schedule_b_reference.xlsx")
     utils = ConverterUtils(reference_file_path)
-    
+
     df = pd.read_csv("data/macronutrients/raw_macro.csv")
     df["hts_code"] = df["hts_code"].astype(str)
 
@@ -30,8 +30,10 @@ def process_hts_data() -> pd.DataFrame:
 
     # Create a DataFrame to hold macronutrient multipliers for each code
     macronutrient_df = pd.DataFrame(all_codes_data).T
-    macronutrient_df.index.name = "hts_code"  # Set index name to match the 'hs' column in df
-    
+    macronutrient_df.index.name = (
+        "hts_code"  # Set index name to match the 'hs' column in df
+    )
+
     # Convert each multiplier to kilograms
     for m in ConverterUtils.get_macronutrients():
         if "mg" in m:
@@ -46,21 +48,27 @@ def process_hts_data() -> pd.DataFrame:
 
     # Create a new column with the first 4 characters of 'hs' in df
     df["hs4"] = df["hts_code"].str[:4]
-    
+
     # Group by hs4
     df = df.groupby(by=["hs4", "year", "qrt"]).agg("sum").reset_index()
-    
+
     # FIX: Drop Otas and Rice
     df = df[(df["hs4"] != "1004") & (df["hs4"] != "1006")]
 
     # Perform the merge using the new column
-    df = df.merge(macronutrient_df, on="hs4", how="left", suffixes=("", "_mult"), validate="many_to_one")
+    df = df.merge(
+        macronutrient_df,
+        on="hs4",
+        how="left",
+        suffixes=("", "_mult"),
+        validate="many_to_one",
+    )
 
     # Calculate the total macronutrients
     macronutrient_list = ConverterUtils.get_macronutrients()
-    
+
     for m in macronutrient_list:
-        df[m] = df["net_qty"] * df[m].fillna(0.00).astype("Float64")
+        df[m] = df["net_qty"] * df[m].fillna(0.00)
 
     def year_quarter_to_datetime(row):
         year = row["year"]
@@ -83,7 +91,7 @@ def process_hts_data() -> pd.DataFrame:
     df["date"] = df["date"] = df.apply(year_quarter_to_datetime, axis=1)
     grouped_df = df.groupby("date").agg("sum").reset_index()
     final_columns = ["date"] + utils.get_macronutrients()
-    
+
     grouped_df[final_columns].to_csv("data/macronutrients/net_macronutrients.csv")
     return grouped_df[final_columns]
 
