@@ -24,7 +24,7 @@ def process_plate_data():
         plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
         data_current_year = hts_data[hts_data["year"] == year]
         for index, row in data_current_year.iterrows():
-            current_code = row["hts_code"][:4].ljust(10, '0')
+            current_code = row["hts_code"][:4].ljust(10, "0")
             if current_code in code_to_category:
                 plate_distribution[code_to_category[current_code]] += 1
         # BANDAID: MOVE ICECREAM COUNT TO OTHER
@@ -32,9 +32,11 @@ def process_plate_data():
         plate_distribution["other"] += plate_distribution["ice_cream"]
         plate_distribution.pop("ice_cream")
 
+        # Sort plate distribution by category
+        plate_distribution = dict(sorted(plate_distribution.items()))
+
         nutrient_distribution_yearly[year] = plate_distribution
-    
-    
+
     # Add latest month for newest data
     latest_month = hts_data[hts_data["year"] == max_year]["month"].max()
     nutrient_distribution_yearly["latest_year_extra"] = {
@@ -44,8 +46,9 @@ def process_plate_data():
     plate_data_out = "data/plate/nutrient_distribution_yearly.json"
     with open(plate_data_out, "w") as f:
         json.dump(nutrient_distribution_yearly, f, indent=4)
+
     print(f"Done, extracted data is available in {plate_data_out}")
 
 
 if __name__ == "__main__":
-    process_plate_data()
+    pass
