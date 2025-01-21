@@ -15,8 +15,13 @@ def main():
 
 def update_data():
 
-    # Pull macronutrient data from API and process
+    # Check for saving directories before calling dataframe save
+    DIRS = ["macronutrients", "plate", "prices", "energy"]
+    for dir in DIRS:
+        if not os.path.exists(f"data/{dir}"):
+            os.makedirs(f"data/{dir}")
 
+    # Pull macronutrient data from API and process
     response = requests.get(
         "https://api.econlabs.net/data/trade/org/?agg=qrt&types=hts&agr=true"
     )
@@ -26,7 +31,6 @@ def update_data():
     process_hts_data()
 
     # Pull plate data
-
     response = requests.get(
         "https://api.econlabs.net/data/trade/org/?agg=monthly&types=hts&agr=true"
     )
@@ -35,19 +39,16 @@ def update_data():
     process_plate_data()
 
     # Pull price data
-
     response = requests.get("https://api.econlabs.net/data/trade/moving")
     if not response:
         raise Exception("Could not get data from econlabs.")
     df = pd.DataFrame(response.json())
     df.to_csv("data/prices/raw_prices.csv")
     save_top_ranking_products()
-    
+
     # Pull energy data
     df = fetch_energy_data()
     df.to_csv("data/energy/processed_energy_data.csv")
-    
-    
 
 
 if __name__ == "__main__":
