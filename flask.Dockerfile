@@ -2,14 +2,14 @@
 
 FROM python:3.10
 
-COPY jp-imports /usr/src/jp-imports
-
-COPY . /usr/src/app
-
 WORKDIR /usr/src/app
+
+COPY requirements.txt .
 
 RUN ["pip", "install", "-r", "requirements.txt"]
 
 EXPOSE 80
+
+COPY . /usr/src/app
 
 CMD ["python3", "main.py"]

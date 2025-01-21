@@ -6,14 +6,8 @@ from utils.converter_utils import ConverterUtils
 
 
 def proccess_price_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    # Get i/e price data
-    if not os.path.exists("data/prices/raw.csv"):
-        res = requests.get("https://api.econlabs.net/data/trade/moving")
-        if not res:
-            raise Exception("Could not get data from econlabs.")
-        df = pd.DataFrame(res.json())
-    else:
-        df: pd.DataFrame = pd.read_csv("data/prices/raw.csv")
+    
+    df = pd.read_csv("data/prices/raw_prices.csv")
     
     df["hs4"] = df["hs4"].astype(str)
     df["date"] = pd.to_datetime(df["date"])

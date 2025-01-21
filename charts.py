@@ -1,12 +1,10 @@
 from pathlib import Path
 
-import os
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from process_energy_data import fetch_energy_data, get_energy_category_map
-from process_fiscal_data import get_country_list, get_net_value_country
-from process_price_data import save_top_ranking_products
+from process_energy_data import get_energy_category_map
+from process_fiscal_data import get_net_value_country
 
 
 def get_macronutrient_timeseries_chart_div(category: str):
@@ -51,7 +49,7 @@ def get_fiscal_timeseries_chart_div(country: str):
 
 
 def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mkwh"):
-    df = fetch_energy_data()
+    df = pd.read_csv("data/energy/processed_energy_data.csv")
 
     agricultural_categories_dict = get_energy_category_map()
     selected_category_col_name = agricultural_categories_dict[category]
@@ -75,10 +73,6 @@ def get_energy_timeseries_chart_div(category: str = "agricultural_consumption_mk
 
 
 def get_product_price_ranking_timeseries_div():
-    # Load the imports and exports data
-    if not os.path.exists("data/prices/price_imports.csv"):
-        save_top_ranking_products()
-
     imports = pd.read_csv("data/prices/price_imports.csv")
     exports = pd.read_csv("data/prices/price_exports.csv")
 
@@ -90,34 +84,38 @@ def get_product_price_ranking_timeseries_div():
     fig = go.Figure()
 
     # Add a bar trace for the imports with hover labels
-    fig.add_trace(go.Bar(
-        x=imports['hs4'],
-        y=imports['pct_change_moving_price'],
-        name='Imports Price Change',
-        marker_color='blue',
-        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
-                      'Price Change: %{y:.2f} %<br>' +
-                      '<extra></extra>'  # Remove the secondary info (trace name)
-    ))
+    fig.add_trace(
+        go.Bar(
+            x=imports["hs4"],
+            y=imports["pct_change_moving_price"],
+            name="Imports Price Change",
+            marker_color="blue",
+            hovertemplate="<b>HS4 Code: %{x}</b><br>"
+            + "Price Change: %{y:.2f} %<br>"
+            + "<extra></extra>",  # Remove the secondary info (trace name)
+        )
+    )
 
-    # Optionally, add a trace for exports with hover labels
-    fig.add_trace(go.Bar(
-        x=exports['hs4'],
-        y=exports['pct_change_moving_price'],
-        name='Exports Price Change',
-        marker_color='orange',
-        hovertemplate='<b>HS4 Code: %{x}</b><br>' +
-                      'Price Change: %{y:.2f} %<br>' +
-                      '<extra></extra>'  # Remove the secondary info (trace name)
-    ))
+    # Add a trace for exports with hover labels
+    fig.add_trace(
+        go.Bar(
+            x=exports["hs4"],
+            y=exports["pct_change_moving_price"],
+            name="Exports Price Change",
+            marker_color="orange",
+            hovertemplate="<b>HS4 Code: %{x}</b><br>"
+            + "Price Change: %{y:.2f} %<br>"
+            + "<extra></extra>",  # Remove the secondary info (trace name)
+        )
+    )
 
     # Update layout
     fig.update_layout(
-        title='Price Change by HS4 Code',
-        xaxis_title='HS4 Code',
-        yaxis_title='Percentage Change in Price',
-        barmode='group',
-        xaxis_tickangle=-45  # Rotate x-axis labels for better readability
+        title="Price Change by HS4 Code",
+        xaxis_title="HS4 Code",
+        yaxis_title="Percentage Change in Price",
+        barmode="group",
+        xaxis_tickangle=-45,  # Rotate x-axis labels for better readability
     )
 
     # Generate the HTML div for embedding
