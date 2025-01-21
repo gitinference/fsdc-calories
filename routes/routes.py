@@ -1,15 +1,15 @@
 from pathlib import Path
 
-from charts import (
+from flask import abort, Blueprint, current_app, json, jsonify, render_template, request
+
+from src.charts import (
     get_energy_timeseries_chart_div,
     get_fiscal_timeseries_chart_div,
     get_macronutrient_timeseries_chart_div,
     get_product_price_ranking_timeseries_div,
 )
-
-from flask import abort, Blueprint, current_app, json, jsonify, render_template, request
-from process_energy_data import get_energy_category_map
-from process_fiscal_data import get_country_list, get_net_value_country
+from src.process_energy_data import get_energy_category_map
+from src.process_fiscal_data import get_country_list, get_net_value_country
 from utils.converter_utils import ConverterUtils
 
 routes = Blueprint("my_routes", __name__)

@@ -40,7 +40,8 @@ def process_plate_data():
     # Add latest month for newest data
     latest_month = hts_data[hts_data["year"] == max_year]["month"].max()
     nutrient_distribution_yearly["latest_year_extra"] = {
-        "latest_month": int(latest_month)
+        "latest_month": int(latest_month),
+        "latest_year": int(max_year),
     }
 
     plate_data_out = "data/plate/nutrient_distribution_yearly.json"
