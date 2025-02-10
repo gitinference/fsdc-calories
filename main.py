@@ -1,6 +1,9 @@
-# FOR FASTAPI: -k uvicorn.workers.UvicornWorker
+from src.data_process import DataCal
 
-from flask_app import app
+
+def main() -> None:
+    print(DataCal().process_int_org(agg="monthly", types="hts").execute())
+
 
 if __name__ == "__main__":
-    app.run(host="localhost", port=5000, debug=True)
+    main()

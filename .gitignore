@@ -255,3 +255,9 @@ data/external
 data/raw
 .vscode
 .python-version
+*.ddb
+*.wal
+*.dta 
+*.xls
+*.txt
+*.sqlite
