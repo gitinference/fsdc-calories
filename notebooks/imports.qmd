@@ -1,0 +1,35 @@
+---
+title: "Agriculture processing"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+```{python}
+import os
+os.chdir("..")
+```
+
+```{python}
+from src.data_process import DataCal
+import polars as pl
+import ibis
+import pandas as pd
+ibis.options.interactive = True
+
+dc = DataCal()
+```
+
+```{python}
+tmp = dc.process_int_org(agg="monthly", types="hts").to_polars()
+```
+
+```{python}
+df = tmp
+nutri_df = pl.read_parquet("data/external/nutri_matrix.parquet")
+df = df.with_columns(
+    hts_code=pl.col("hts_code").str.slice(0,4)
+    ).drop(pl.col("hts_id"))
+df.group_by(["year", "month", "hts_code"]).agg(pl.col("*").sum())
+```
