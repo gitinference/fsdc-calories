@@ -12,9 +12,10 @@ class DataCal(DataTrade):
         super().__init__(saving_dir, database_url)
 
     def gen_nuti_data(self) -> pl.DataFrame:
-        if not os.path.exists(f"{self.saving_dir}external/nutrition.parquet"):
+        if not os.path.exists(f"{self.saving_dir}external/nutri_matrix.parquet"):
             self.pull_file(
-                url="", filename=f"{self.saving_dir}external/nutrition.parquet"
+                url="https://github.com/EconLabs/fsdc-calories/raw/refs/heads/5-corrections/data/external/nutri_matrix.parquet",
+                filename=f"{self.saving_dir}external/nutrition.parquet",
             )
         nutri_df = pl.read_parquet("data/external/nutri_matrix.parquet")
         df = self.process_int_org(types="hts", agg="monthly").to_polars()
@@ -110,4 +111,3 @@ class DataCal(DataTrade):
         )
 
         return chart
-
