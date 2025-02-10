@@ -1,0 +1,20 @@
+---
+title: "Agriculture processing"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+```{python}
+import os
+os.chdir("..")
+```
+
+
+```{python}
+
+from src.data_process import DataCal
+
+DataCal().gen_graphs()
+```

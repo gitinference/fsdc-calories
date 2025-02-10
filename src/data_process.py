@@ -1,4 +1,3 @@
-from ibis.expr.datatypes import uint16
 from .jp_imports.src.jp_imports.data_process import DataTrade
 import altair as alt
 import polars as pl
@@ -17,7 +16,7 @@ class DataCal(DataTrade):
                 url="https://github.com/EconLabs/fsdc-calories/raw/refs/heads/5-corrections/data/external/nutri_matrix.parquet",
                 filename=f"{self.saving_dir}external/nutri_matrix.parquet",
             )
-        nutri_df = pl.read_parquet("data/external/nutri_matrix.parquet")
+        nutri_df = pl.read_parquet(f"{self.saving_dir}external/nutri_matrix.parquet")
         df = self.process_int_org(types="hts", agg="monthly").to_polars()
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4)).drop(
