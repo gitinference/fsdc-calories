@@ -13,7 +13,7 @@ class DataCal(DataTrade):
     def gen_nuti_data(self) -> pl.DataFrame:
         if not os.path.exists(f"{self.saving_dir}external/nutri_matrix.parquet"):
             self.pull_file(
-                url="https://github.com/EconLabs/fsdc-calories/raw/refs/heads/5-corrections/data/external/nutri_matrix.parquet",
+                url="https://github.com/EconLabs/fsdc-calories/raw/refs/heads/master/data/external/nutri_matrix.parquet",
                 filename=f"{self.saving_dir}external/nutri_matrix.parquet",
             )
         nutri_df = pl.read_parquet(f"{self.saving_dir}external/nutri_matrix.parquet")
