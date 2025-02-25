@@ -84,6 +84,30 @@ class DataCal(DataTrade):
 
         return df
 
+    def gen_price_rankings(self) -> pl.DataFrame:
+        
+        # TODO: Replace this with appropiate call to jp_imports package
+        if not os.path.exists(f"{self.saving_dir}external/raw_moving_price_data.json"):
+            self.pull_file(
+                url="https://api.econlabs.net/data/trade/moving/",
+                filename=f"{self.saving_dir}external/raw_moving_price_data.json",
+            )
+        df = pl.from_pandas(
+            pd.read_json(
+                f"{self.saving_dir}external/raw_moving_price_data.json",
+                # schema={
+                #     "date": pl.String,
+                #     "hs4": pl.UInt32,
+                #     "prev_year_imports": pl.UInt64,
+                #     "prev_year_exports": pl.UInt64,
+                # },
+            )
+        )
+
+        # TODO: Add logic to order by prev_year_imports and prev_year_exports (this is percent moving price)
+
+        return df
+
     def gen_graphs(self):
         cols = [
             "total_calaries",
