@@ -1,7 +1,9 @@
+from datetime import datetime
 from .jp_imports.src.data.data_process import DataTrade
 import altair as alt
 import polars as pl
 import os
+import pandas as pd
 
 
 class DataCal(DataTrade):
@@ -94,6 +96,25 @@ class DataCal(DataTrade):
         df = df.filter(pl.col("total_iron_mg_ecdf") < 0.9999)
         df = df.group_by(["year", "month"]).agg(pl.all().sum())
         df = df.with_columns(datetime=pl.datetime(pl.col("year"), pl.col("month"), 1))
+
+        return df
+
+    def gen_price_rankings(self) -> pl.DataFrame:
+        
+        df = self.process_price(agriculture_filter=True).to_pandas()
+        
+        month = datetime.now().month if datetime.now().month != 1 else 12
+        year = datetime.now().year if datetime.now().month != 1 else datetime.now().year - 1
+        
+        # Handle case where latest available data is older than last month
+        month = min(df["date"].max().month, month)
+        year = min(df["date"].max().year, year)
+        
+        filter = (df['date'].dt.month == month) & (df['date'].dt.year == year)
+        df = df[filter]
+        
+        cols = ["hs4", "date", "prev_year_imports", "prev_year_exports"]
+        df = df[cols]
 
         return df
 
