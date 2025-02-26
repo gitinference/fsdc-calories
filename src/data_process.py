@@ -118,7 +118,7 @@ class DataCal(DataTrade):
 
         return df
 
-    def gen_graphs(self):
+    def gen_graphs_nuti_data(self):
         cols = [
             "total_calaries",
             "total_fats",
