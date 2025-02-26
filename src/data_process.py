@@ -30,7 +30,7 @@ class DataCal(DataTrade):
 
         df = df.join(nutri_df, on="hts_code", how="inner")
         df = df.with_columns(
-            total_calaries=(pl.col("qty_imports") - pl.col("qty_exports"))
+            total_calories=(pl.col("qty_imports") - pl.col("qty_exports"))
             * pl.col("calories"),
             total_fats=(pl.col("qty_imports") - pl.col("qty_exports")) * pl.col("fats"),
             total_sugars=(pl.col("qty_imports") - pl.col("qty_exports"))
@@ -59,7 +59,7 @@ class DataCal(DataTrade):
             * pl.col("iron_mg"),
         )
         cols = [
-            "total_calaries",
+            "total_calories",
             "total_fats",
             "total_sugars",
             "total_protein",
@@ -83,7 +83,7 @@ class DataCal(DataTrade):
         )
         df = df.filter(pl.col("total_fats_ecdf") < 0.9999)
         df = df.filter(pl.col("total_sugars_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_protein_ecdf") < 0.9999)
+        df = df.filter(pl.col("total_procaloriestein_ecdf") < 0.9999)
         df = df.filter(pl.col("total_saturated_fat_g_ecdf") < 0.9999)
         df = df.filter(pl.col("total_sodium_mg_ecdf") < 0.9999)
         df = df.filter(pl.col("total_cholesterol_mg_ecdf") < 0.9999)
@@ -120,7 +120,7 @@ class DataCal(DataTrade):
 
     def gen_graphs_nuti_data(self):
         cols = [
-            "total_calaries",
+            "total_calories",
             "total_fats",
             "total_sugars",
             "total_protein",
