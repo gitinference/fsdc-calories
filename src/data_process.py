@@ -122,7 +122,7 @@ class DataCal(DataTrade):
             .encode(x="datetime:T", y=alt.Y("y:Q").title(""))
             .transform_calculate(y=f"datum[{ycol_param.name}]")
             .add_params(ycol_param)
-            .properties(width=800, height=300)
+            .properties(width="container")
         )
 
         return chart

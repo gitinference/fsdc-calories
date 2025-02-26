@@ -19,5 +19,6 @@ import polars as pl
 
 df = DataCal().gen_nuti_data()
 # df = df["total_calaries"]
-df.filter(pl.col("datetime") == pl.col("datetime").max())
+DataCal().gen_graphs()
+
 ```
