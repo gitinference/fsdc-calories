@@ -22,7 +22,7 @@ class DataCal(DataTrade):
                 filename=f"{self.saving_dir}external/nutri_matrix.parquet",
             )
         nutri_df = pl.read_parquet(f"{self.saving_dir}external/nutri_matrix.parquet")
-        df = self.process_int_org(time_frame="monthly", level="monthly").to_polars()
+        df = self.process_int_org(time_frame="monthly", level="hts").to_polars()
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4)).drop(
             pl.col("hts_id")
@@ -30,20 +30,33 @@ class DataCal(DataTrade):
 
         df = df.join(nutri_df, on="hts_code", how="inner")
         df = df.with_columns(
-            total_calaries=pl.col("qty_imports") * pl.col("calories"),
-            total_fats=pl.col("qty_imports") * pl.col("fats"),
-            total_sugars=pl.col("qty_imports") * pl.col("sugars"),
-            total_protein=pl.col("qty_imports") * pl.col("protein"),
-            total_saturated_fat_g=pl.col("qty_imports") * pl.col("saturated_fat_g"),
-            total_cholesterol_mg=pl.col("qty_imports") * pl.col("cholesterol_mg"),
-            total_sodium_mg=pl.col("qty_imports") * pl.col("sodium_mg"),
-            total_carbohydrate_g=pl.col("qty_imports") * pl.col("carbohydrate_g"),
-            total_fiber_g=pl.col("qty_imports") * pl.col("fiber_g"),
-            total_sugar_g=pl.col("qty_imports") * pl.col("sugar_g"),
-            total_vitamin_d_iu=pl.col("qty_imports") * pl.col("vitamin_d_iu"),
-            total_calcium_mg=pl.col("qty_imports") * pl.col("calcium_mg"),
-            total_potassium_mg=pl.col("qty_imports") * pl.col("potassium_mg"),
-            total_iron_mg=pl.col("qty_imports") * pl.col("iron_mg"),
+            total_calaries=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("calories"),
+            total_fats=(pl.col("qty_imports") - pl.col("qty_exports")) * pl.col("fats"),
+            total_sugars=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("sugars"),
+            total_protein=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("protein"),
+            total_saturated_fat_g=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("saturated_fat_g"),
+            total_cholesterol_mg=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("cholesterol_mg"),
+            total_sodium_mg=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("sodium_mg"),
+            total_carbohydrate_g=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("carbohydrate_g"),
+            total_fiber_g=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("fiber_g"),
+            total_sugar_g=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("sugar_g"),
+            total_vitamin_d_iu=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("vitamin_d_iu"),
+            total_calcium_mg=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("calcium_mg"),
+            total_potassium_mg=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("potassium_mg"),
+            total_iron_mg=(pl.col("qty_imports") - pl.col("qty_exports"))
+            * pl.col("iron_mg"),
         )
         cols = [
             "total_calaries",
@@ -130,7 +143,7 @@ class DataCal(DataTrade):
             .encode(x="datetime:T", y=alt.Y("y:Q").title(""))
             .transform_calculate(y=f"datum[{ycol_param.name}]")
             .add_params(ycol_param)
-            .properties(width=800, height=300)
+            .properties(width="container")
         )
 
         return chart
