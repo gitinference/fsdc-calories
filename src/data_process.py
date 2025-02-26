@@ -1,3 +1,4 @@
+from datetime import datetime
 from .jp_imports.src.data.data_process import DataTrade
 import altair as alt
 import polars as pl
@@ -87,19 +88,20 @@ class DataCal(DataTrade):
 
     def gen_price_rankings(self) -> pl.DataFrame:
         
-        # TODO: Replace this with appropiate call to jp_imports package
-        if not os.path.exists(f"{self.saving_dir}external/raw_moving_price_data.json"):
-            self.pull_file(
-                url="https://api.econlabs.net/data/trade/moving/",
-                filename=f"{self.saving_dir}external/raw_moving_price_data.json",
-            )
-        df = pl.from_pandas(
-            pd.read_json(
-                f"{self.saving_dir}external/raw_moving_price_data.json",
-            )
-        )
-
-        # TODO: Add logic to order by prev_year_imports and prev_year_exports (this is percent moving price)
+        df = self.process_price(agriculture_filter=True).to_pandas()
+        
+        month = datetime.now().month if datetime.now().month != 1 else 12
+        year = datetime.now().year if datetime.now().month != 1 else datetime.now().year - 1
+        
+        # Handle case where latest available data is older than last month
+        month = min(df["date"].max().month, month)
+        year = min(df["date"].max().year, year)
+        
+        filter = (df['date'].dt.month == month) & (df['date'].dt.year == year)
+        df = df[filter]
+        
+        cols = ["hs4", "date", "prev_year_imports", "prev_year_exports"]
+        df = df[cols]
 
         return df
 
