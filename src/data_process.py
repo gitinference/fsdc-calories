@@ -1,4 +1,4 @@
-from .jp_imports.src.jp_imports.data_process import DataTrade
+from .jp_imports.src.data.data_process import DataTrade
 import altair as alt
 import polars as pl
 import os
@@ -6,9 +6,12 @@ import os
 
 class DataCal(DataTrade):
     def __init__(
-        self, saving_dir: str = "data/", database_url: str = "duckdb:///data.ddb"
+        self,
+        saving_dir: str = "data/",
+        database_file: str = "data.ddb",
+        log_file: str = "data_process.log",
     ):
-        super().__init__(saving_dir, database_url)
+        super().__init__(saving_dir, database_file, log_file)
 
     def gen_nuti_data(self) -> pl.DataFrame:
         if not os.path.exists(f"{self.saving_dir}external/nutri_matrix.parquet"):
@@ -17,7 +20,7 @@ class DataCal(DataTrade):
                 filename=f"{self.saving_dir}external/nutri_matrix.parquet",
             )
         nutri_df = pl.read_parquet(f"{self.saving_dir}external/nutri_matrix.parquet")
-        df = self.process_int_org(types="hts", agg="monthly").to_polars()
+        df = self.process_int_org(time_frame="monthly", level="monthly").to_polars()
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4)).drop(
             pl.col("hts_id")

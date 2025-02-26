@@ -15,6 +15,9 @@ os.chdir("..")
 ```{python}
 
 from src.data_process import DataCal
+import polars as pl
 
-DataCal().gen_graphs()
+df = DataCal().gen_nuti_data()
+# df = df["total_calaries"]
+df.filter(pl.col("datetime") == pl.col("datetime").max())
 ```
