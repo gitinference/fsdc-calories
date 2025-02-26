@@ -2,6 +2,7 @@ from .jp_imports.src.data.data_process import DataTrade
 import altair as alt
 import polars as pl
 import os
+import pandas as pd
 
 
 class DataCal(DataTrade):
@@ -95,12 +96,6 @@ class DataCal(DataTrade):
         df = pl.from_pandas(
             pd.read_json(
                 f"{self.saving_dir}external/raw_moving_price_data.json",
-                # schema={
-                #     "date": pl.String,
-                #     "hs4": pl.UInt32,
-                #     "prev_year_imports": pl.UInt64,
-                #     "prev_year_exports": pl.UInt64,
-                # },
             )
         )
 
