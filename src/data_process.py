@@ -83,7 +83,7 @@ class DataCal(DataTrade):
         )
         df = df.filter(pl.col("total_fats_ecdf") < 0.9999)
         df = df.filter(pl.col("total_sugars_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_procaloriestein_ecdf") < 0.9999)
+        df = df.filter(pl.col("total_protein_ecdf") < 0.9999)
         df = df.filter(pl.col("total_saturated_fat_g_ecdf") < 0.9999)
         df = df.filter(pl.col("total_sodium_mg_ecdf") < 0.9999)
         df = df.filter(pl.col("total_cholesterol_mg_ecdf") < 0.9999)
