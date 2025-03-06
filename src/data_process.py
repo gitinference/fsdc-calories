@@ -127,12 +127,12 @@ class DataCal(DataTrade):
         imports = (
             df[["hs4", "pct_change_imports"]]
             .rename(columns=rename_map)
-            .sort_values(by="pct_change")
+            .sort_values(by="pct_change", ascending=False)
         )
         exports = (
             df[["hs4", "pct_change_exports"]]
             .rename(columns=rename_map)
-            .sort_values(by="pct_change")
+            .sort_values(by="pct_change", ascending=False)
         )
 
         return imports, exports
