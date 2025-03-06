@@ -1,9 +1,11 @@
-from datetime import datetime
-from .jp_imports.src.data.data_process import DataTrade
-import altair as alt
-import polars as pl
 import os
+from datetime import date, datetime, timedelta
+
+import altair as alt
 import pandas as pd
+import polars as pl
+
+from .jp_imports.src.data.data_process import DataTrade
 
 
 class DataCal(DataTrade):
@@ -99,26 +101,43 @@ class DataCal(DataTrade):
 
         return df
 
-    def gen_price_rankings(self) -> pl.DataFrame:
-        
-        df = self.process_price(agriculture_filter=True).to_pandas()
-        
-        month = datetime.now().month if datetime.now().month != 1 else 12
-        year = datetime.now().year if datetime.now().month != 1 else datetime.now().year - 1
-        
-        # Handle case where latest available data is older than last month
-        month = min(df["date"].max().month, month)
-        year = min(df["date"].max().year, year)
-        
-        filter = (df['date'].dt.month == month) & (df['date'].dt.year == year)
+    def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+        df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
+
+        # Get date object of 1st day of last month
+        today = date.today()
+        first = today.replace(day=1)
+        last_month = first - timedelta(days=1)
+        last_month = last_month.replace(day=1)
+
+        # # Handle case where latest available data is older than last month
+        last_month = min(pd.Timestamp(last_month), df["date"].max())
+
+        # Apply last month filter
+        filter = df["date"] >= last_month
         df = df[filter]
-        
-        cols = ["hs4", "date", "prev_year_imports", "prev_year_exports"]
-        df = df[cols]
 
-        return df
+        rename_map = {
+            "pct_change_imports": "pct_change",
+            "pct_change_exports": "pct_change",
+        }
 
-    def gen_graphs(self):
+        # Seperate imports and exports to different dataframes
+        imports = (
+            df[["hs4", "pct_change_imports"]]
+            .rename(columns=rename_map)
+            .sort_values(by="pct_change", ascending=False)
+        )
+        exports = (
+            df[["hs4", "pct_change_exports"]]
+            .rename(columns=rename_map)
+            .sort_values(by="pct_change", ascending=False)
+        )
+
+        return imports, exports
+
+    def gen_graphs_nuti_data(self):
         cols = [
             "total_calories",
             "total_fats",
@@ -147,3 +166,26 @@ class DataCal(DataTrade):
         )
 
         return chart
+
+    def gen_graphs_price_change(self) -> alt.HConcatChart:
+
+        imports, exports = self.gen_price_rankings()
+
+        # Limit to top 10 for each dataframe
+        imports, exports = imports.head(10), exports.head(10)
+
+        imports_chart = (
+            alt.Chart(imports)
+            .mark_bar()
+            .encode(x="hs4", y="pct_change")
+            .properties(width="container", title="Imports")
+        )
+
+        exports_chart = (
+            alt.Chart(exports)
+            .mark_bar()
+            .encode(x="hs4", y="pct_change")
+            .properties(width="container", title="Exports")
+        )
+
+        return alt.hconcat(imports_chart, exports_chart)
