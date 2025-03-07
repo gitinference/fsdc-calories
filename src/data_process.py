@@ -2,6 +2,7 @@ import os
 from datetime import date, timedelta
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -104,6 +105,10 @@ class DataCal(DataTrade):
 
         import_pct_col = "pct_change_imports_year_over_year"
         export_pct_col = "pct_change_exports_year_over_year"
+
+        # Fix: remove infs from the dataframe (somehow we have infinite percent change???)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.dropna(subset=[import_pct_col, export_pct_col])
 
         # Get date object of 1st day of last month
         today = date.today()
