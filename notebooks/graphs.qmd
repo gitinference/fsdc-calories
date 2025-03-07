@@ -9,16 +9,27 @@ jupyter: python3
 ```{python}
 import os
 os.chdir("..")
-```
-
-
-```{python}
-
 from src.data_process import DataCal
 import polars as pl
+import altair as alt
+```
 
-df = DataCal().gen_nuti_data()
-# df = df["total_calaries"]
-DataCal().gen_graphs()
+```{python}
+df = DataCal().process_price(agriculture_filter=True).filter(pl.col("date") == pl.col("date").max())
+df
+```
 
+```{python}
+df = DataCal().process_price(agriculture_filter=True).filter(pl.col("date") == pl.col("date").max()).sort("moving_price_imports").limit(10)
+imports_chart = (
+            alt.Chart(df)
+            .mark_bar()
+            .encode(x="hs4", y="moving_price_imports")
+            .properties(width="container", title="Imports")
+        )
+imports_chart   
+```
+
+```{python}
+DataCal().g
 ```
