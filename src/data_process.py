@@ -189,11 +189,11 @@ class DataCal(DataTrade):
             .properties(width="container", title="Imports")
         )
 
-        exports_chart = (
-            alt.Chart(exports)
-            .mark_bar()
-            .encode(x="hs4", y="pct_change")
-            .properties(width="container", title="Exports")
-        )
+        # exports_chart = (
+        #     alt.Chart(exports)
+        #     .mark_bar()
+        #     .encode(x="hs4", y="pct_change")
+        #     .properties(width="container", title="Exports")
+        # )
 
-        return alt.hconcat(imports_chart, exports_chart)
+        return imports_chart
