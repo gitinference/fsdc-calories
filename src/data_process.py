@@ -123,6 +123,10 @@ class DataCal(DataTrade):
         filter = df["date"] >= last_month
         df = df[filter]
 
+        # Put pct_change in terms of percentage
+        df[import_pct_col] *= 100
+        df[export_pct_col] *= 100
+
         rename_map = {
             import_pct_col: "pct_change",
             export_pct_col: "pct_change",
