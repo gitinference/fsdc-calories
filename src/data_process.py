@@ -2,6 +2,7 @@ import os
 from datetime import date, timedelta
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -102,6 +103,13 @@ class DataCal(DataTrade):
     def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
 
+        import_pct_col = "pct_change_imports_year_over_year"
+        export_pct_col = "pct_change_exports_year_over_year"
+
+        # Fix: remove infs from the dataframe (somehow we have infinite percent change???)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.dropna(subset=[import_pct_col, export_pct_col])
+
         # Get date object of 1st day of last month
         today = date.today()
         first = today.replace(day=1)
@@ -115,19 +123,23 @@ class DataCal(DataTrade):
         filter = df["date"] >= last_month
         df = df[filter]
 
+        # Put pct_change in terms of percentage
+        df[import_pct_col] *= 100
+        df[export_pct_col] *= 100
+
         rename_map = {
-            "pct_change_imports": "pct_change",
-            "pct_change_exports": "pct_change",
+            import_pct_col: "pct_change",
+            export_pct_col: "pct_change",
         }
 
         # Seperate imports and exports to different dataframes
         imports = (
-            df[["hs4", "pct_change_imports"]]
+            df[["hs4", import_pct_col]]
             .rename(columns=rename_map)
             .sort_values(by="pct_change", ascending=False)
         )
         exports = (
-            df[["hs4", "pct_change_exports"]]
+            df[["hs4", export_pct_col]]
             .rename(columns=rename_map)
             .sort_values(by="pct_change", ascending=False)
         )
@@ -177,11 +189,11 @@ class DataCal(DataTrade):
             .properties(width="container", title="Imports")
         )
 
-        exports_chart = (
-            alt.Chart(exports)
-            .mark_bar()
-            .encode(x="hs4", y="pct_change")
-            .properties(width="container", title="Exports")
-        )
+        # exports_chart = (
+        #     alt.Chart(exports)
+        #     .mark_bar()
+        #     .encode(x="hs4", y="pct_change")
+        #     .properties(width="container", title="Exports")
+        # )
 
-        return alt.hconcat(imports_chart, exports_chart)
+        return imports_chart
