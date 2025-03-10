@@ -4,6 +4,8 @@ from typing import List, Set
 import numpy as np
 import pandas as pd
 
+from src.utils.constants import Constants
+
 
 class ConverterUtils:
 
@@ -21,8 +23,6 @@ class ConverterUtils:
 
     # Returns a dictionary of schedule_b -> my_plate_category
     def schedule_b_to_category(self):
-        from utils.constants import Constants
-
         schedule_b_data = pd.DataFrame(self.data)
 
         code_to_category = dict()
