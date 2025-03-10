@@ -4,7 +4,7 @@ from typing import List, Set
 import numpy as np
 import pandas as pd
 
-from src.utils.constants import Constants
+from .constants import Constants
 
 
 class ConverterUtils:

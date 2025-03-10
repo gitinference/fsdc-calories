@@ -1,15 +1,16 @@
 import os
 from datetime import date, timedelta
+from pathlib import Path
 
 import altair as alt
 import numpy as np
 import pandas as pd
 import polars as pl
 
-from src.utils.constants import Constants
-from src.utils.converter_utils import ConverterUtils
-
 from .jp_imports.src.data.data_process import DataTrade
+
+from .utils.constants import Constants
+from .utils.converter_utils import ConverterUtils
 
 
 class DataCal(DataTrade):
@@ -152,7 +153,11 @@ class DataCal(DataTrade):
     def gen_plate_data(self) -> pd.DataFrame:
 
         # Data paths
-        schedule_b_reference_path = "data/schedule_b_reference.xlsx"
+        script_dir = Path(__file__).resolve().parent
+
+        schedule_b_reference_path = (
+            script_dir / ".." / "data" / "schedule_b_reference.xlsx"
+        )
         hts_data = (
             DataTrade()
             .process_int_org(time_frame="monthly", level="hts", agriculture_filter=True)
@@ -251,8 +256,13 @@ class DataCal(DataTrade):
             year
             for year in range(plate_data["year"].min(), plate_data["year"].max() + 1)
         ]
+        valid_years.reverse()
+
+        max_year = max(valid_years)
         year_dropdown = alt.binding_select(options=valid_years, name="Year")
-        year_select = alt.selection_point(fields=["year"], bind=year_dropdown)
+        year_select = alt.selection_point(
+            fields=["year"], bind=year_dropdown, value=max_year - 1
+        )
 
         chart = (
             alt.Chart(plate_data)
