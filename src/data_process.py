@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from src.utils.constants import Constants
+from src.utils.converter_utils import ConverterUtils
+
 from .jp_imports.src.data.data_process import DataTrade
 
 
@@ -146,6 +149,49 @@ class DataCal(DataTrade):
 
         return imports, exports
 
+    def gen_plate_data(self) -> pd.DataFrame:
+
+        # Data paths
+        schedule_b_reference_path = "data/schedule_b_reference.xlsx"
+        hts_data = (
+            DataTrade()
+            .process_int_org(time_frame="monthly", level="hts", agriculture_filter=True)
+            .to_pandas()
+        )
+
+        hts_data["hts_code"] = hts_data["hts_code"].astype(str)
+
+        utils = ConverterUtils(schedule_b_reference_path)
+        code_to_category = utils.schedule_b_to_category()
+
+        nutrient_distribution_yearly = {}
+
+        min_year, max_year = hts_data["year"].min(), hts_data["year"].max()
+        for year in range(min_year, max_year + 1):
+            plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
+            data_current_year = hts_data[hts_data["year"] == year]
+            for index, row in data_current_year.iterrows():
+                current_code = row["hts_code"][:4].ljust(10, "0")
+                if current_code in code_to_category:
+                    plate_distribution[code_to_category[current_code]] += 1
+            # BANDAID: MOVE ICECREAM COUNT TO OTHER
+
+            plate_distribution["other"] += plate_distribution["ice_cream"]
+            plate_distribution.pop("ice_cream")
+
+            # Sort plate distribution by category
+            plate_distribution = dict(sorted(plate_distribution.items()))
+
+            nutrient_distribution_yearly[year] = plate_distribution
+
+        df = (
+            pd.DataFrame(nutrient_distribution_yearly)
+            .reset_index()
+            .rename(columns={"index": "category"})
+        )
+        df_long = pd.melt(df, id_vars=["category"], var_name="year", value_name="value")
+        return df_long
+
     def gen_graphs_nuti_data(self):
         cols = [
             "total_calories",
@@ -197,3 +243,24 @@ class DataCal(DataTrade):
         # )
 
         return imports_chart
+
+    def gen_graphs_plate(self) -> alt.Chart:
+        plate_data: pd.DataFrame = self.gen_plate_data()
+
+        valid_years = [
+            year
+            for year in range(plate_data["year"].min(), plate_data["year"].max() + 1)
+        ]
+        year_dropdown = alt.binding_select(options=valid_years, name="Year")
+        year_select = alt.selection_point(fields=["year"], bind=year_dropdown)
+
+        chart = (
+            alt.Chart(plate_data)
+            .mark_arc()
+            .encode(theta="value", color="category")
+            .add_params(year_select)
+            .transform_filter(year_select)
+            .properties(title="Yearly MyPlate Nutrient Distribution")
+        )
+
+        return chart
