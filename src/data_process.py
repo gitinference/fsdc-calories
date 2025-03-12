@@ -198,23 +198,28 @@ class DataCal(DataTrade):
         return df_long
 
     def gen_graphs_nuti_data(self):
-        cols = [
-            "total_calories",
-            "total_fats",
-            "total_sugars",
-            "total_protein",
-            "total_saturated_fat_g",
-            "total_cholesterol_mg",
-            "total_sodium_mg",
-            "total_carbohydrate_g",
-            "total_fiber_g",
-            "total_sugar_g",
-            "total_vitamin_d_iu",
-            "total_calcium_mg",
-            "total_potassium_mg",
-            "total_iron_mg",
-        ]
-        dropdown = alt.binding_select(options=cols, name="Y-axis column ")
+        column_label_map = {
+            "total_calories": "Calories",
+            "total_fats": "Fats",
+            "total_sugars": "Sugars",
+            "total_protein": "Proteins",
+            "total_saturated_fat_g": "Saturated Fats (g)",
+            "total_cholesterol_mg": "Cholesterol (mg)",
+            "total_sodium_mg": "Sodium (mg)",
+            "total_carbohydrate_g": "Carbohydrates (g)",
+            "total_fiber_g": "Fibers (g)",
+            "total_sugar_g": "Sugars (g)",
+            "total_vitamin_d_iu": "Vitam D (iu)",
+            "total_calcium_mg": "Calcium (mg)",
+            "total_potassium_mg": "Potassium (mg)",
+            "total_iron_mg": "Iron (mg)",
+        }
+
+        dropdown = alt.binding_select(
+            options=column_label_map.keys(),
+            name="Y-axis column",
+            labels=column_label_map.values(),
+        )
         ycol_param = alt.param(value="total_iron_mg", bind=dropdown)
         chart = (
             alt.Chart(self.gen_nuti_data().sort(pl.col("datetime")))
