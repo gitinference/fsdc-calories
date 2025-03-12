@@ -1,5 +1,5 @@
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -257,6 +257,16 @@ class DataCal(DataTrade):
     def gen_graphs_plate(self) -> alt.Chart:
         plate_data: pd.DataFrame = self.gen_plate_data()
 
+        # Calculate percent of category for each year
+        plate_data["pct"] = (
+            plate_data["value"]
+            / plate_data.groupby(by="year")["value"].transform("sum")
+            * 100
+        ).round(1)
+
+        # Bandaid: Prefix each pct value with % for chart display
+        plate_data["pct_text"] = plate_data["pct"].astype(str) + "%"
+
         valid_years = [
             year
             for year in range(plate_data["year"].min(), plate_data["year"].max() + 1)
@@ -269,13 +279,21 @@ class DataCal(DataTrade):
             fields=["year"], bind=year_dropdown, value=max_year - 1
         )
 
-        chart = (
+        base = (
             alt.Chart(plate_data)
-            .mark_arc()
-            .encode(theta="value", color="category")
+            .encode(
+                theta=alt.Theta("pct:Q").stack(True),
+                color=alt.Color("category"),
+            )
             .add_params(year_select)
             .transform_filter(year_select)
             .properties(title="Yearly MyPlate Nutrient Distribution")
         )
 
-        return chart
+        c1 = base.mark_arc(outerRadius=100, innerRadius=20, stroke="#fff")
+
+        c2 = base.mark_text(radius=100, radiusOffset=15, size=10).encode(
+            text="pct_text:N"
+        )
+
+        return c1 + c2
