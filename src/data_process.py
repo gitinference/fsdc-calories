@@ -127,9 +127,9 @@ class DataCal(DataTrade):
         filter = df["date"] >= last_month
         df = df[filter]
 
-        # Put pct_change in terms of percentage
-        df[import_pct_col] *= 100
-        df[export_pct_col] *= 100
+        # Put pct_change in terms of decimals
+        df[import_pct_col] /= 100
+        df[export_pct_col] /= 100
 
         rename_map = {
             import_pct_col: "pct_change",
@@ -241,7 +241,10 @@ class DataCal(DataTrade):
         imports_chart = (
             alt.Chart(imports)
             .mark_bar()
-            .encode(x="hs4", y="pct_change")
+            .encode(
+                x=alt.X("pct_change").axis(format="%", title="Change in price"),
+                y=alt.Y("hs4").sort("-x").axis(title="HS4"),
+            )
             .properties(width="container", title="Imports")
         )
 
