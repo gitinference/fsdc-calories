@@ -241,7 +241,7 @@ class DataCal(DataTrade):
         imports_chart = (
             alt.Chart(imports)
             .mark_bar()
-            .encode(x="hs4", y="pct_change")
+            .encode(x=alt.X("pct_change"), y=alt.Y("hs4"))
             .properties(width="container", title="Imports")
         )
 
