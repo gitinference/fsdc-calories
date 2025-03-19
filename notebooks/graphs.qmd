@@ -11,25 +11,37 @@ import os
 os.chdir("..")
 from src.data_process import DataCal
 import polars as pl
+import pandas as pd
 import altair as alt
+ds = DataCal()
 ```
 
 ```{python}
-df = DataCal().process_price(agriculture_filter=True).filter(pl.col("date") == pl.col("date").max())
-df
+ds.gen_graphs_nuti_data()
 ```
 
 ```{python}
-df = DataCal().process_price(agriculture_filter=True).filter(pl.col("date") == pl.col("date").max()).sort("moving_price_imports").limit(10)
-imports_chart = (
-            alt.Chart(df)
-            .mark_bar()
-            .encode(x="hs4", y="moving_price_imports")
-            .properties(width="container", title="Imports")
-        )
-imports_chart   
+ds.gen_graphs_price_change()
 ```
 
 ```{python}
-DataCal().g
+imports, exports = ds.gen_price_rankings()
+top = imports.head(10)
+bottom = imports.tail(10)
+imports = pd.concat([top, bottom], ignore_index=True, sort=False)
+
 ```
+
+
+```{python}
+df = ds.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
+df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
+df["hs4"] = df["hts_code"].str.slice(stop=4)
+df = df.drop_duplicates(subset=['hs4']).reset_index(drop=True)
+df = df[["hs4", "hts_desc"]]
+```
+
+
+```{python}
+imports.join(df.set_index("hs4"), on='hs4')
+ ```
