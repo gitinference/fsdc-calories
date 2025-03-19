@@ -236,24 +236,27 @@ class DataCal(DataTrade):
         imports, exports = self.gen_price_rankings()
 
         # Limit to top 10 for each dataframe
-        imports, exports = imports.head(10), exports.head(10)
+        top = imports.head(10)
+        bottom = imports.tail(10)
+        imports = pd.concat([top, bottom], ignore_index=True, sort=False)
+
+        df = self.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
+        df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
+        df["hs4"] = df["hts_code"].str.slice(stop=4)
+        df = df.drop_duplicates(subset=['hs4']).reset_index(drop=True)
+        df = df[["hs4", "hts_desc"]]
+
+        df = imports.join(df.set_index("hs4"), on='hs4')
 
         imports_chart = (
-            alt.Chart(imports)
+            alt.Chart(df)
             .mark_bar()
             .encode(
                 x=alt.X("pct_change").axis(format="%", title="Change in price"),
-                y=alt.Y("hs4").sort("-x").axis(title="HS4"),
+                y=alt.Y("hts_desc").sort("-x").axis(title="HS4"),
             )
             .properties(width="container", title="Imports")
         )
-
-        # exports_chart = (
-        #     alt.Chart(exports)
-        #     .mark_bar()
-        #     .encode(x="hs4", y="pct_change")
-        #     .properties(width="container", title="Exports")
-        # )
 
         return imports_chart
 
