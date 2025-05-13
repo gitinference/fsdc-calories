@@ -1,4 +1,0 @@
-[submodule "src/jp_imports"]
-	path = src/jp_imports
-	url = https://github.com/ouslan/jp-imports
-	branch = main
