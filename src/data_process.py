@@ -243,10 +243,10 @@ class DataCal(DataTrade):
         df = self.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
         df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
         df["hs4"] = df["hts_code"].str.slice(stop=4)
-        df = df.drop_duplicates(subset=['hs4']).reset_index(drop=True)
+        df = df.drop_duplicates(subset=["hs4"]).reset_index(drop=True)
         df = df[["hs4", "hts_desc"]]
 
-        df = imports.join(df.set_index("hs4"), on='hs4')
+        df = imports.join(df.set_index("hs4"), on="hs4")
 
         imports_chart = (
             alt.Chart(df)
@@ -296,7 +296,7 @@ class DataCal(DataTrade):
             .properties(title="Yearly MyPlate Nutrient Distribution")
         )
 
-        c1 = base.mark_arc(outerRadius=100, innerRadius=20, stroke="#fff")
+        c1 = base.mark_arc(outerRadius=100, stroke="#fff")
 
         c2 = base.mark_text(radius=100, radiusOffset=15, size=10).encode(
             text="pct_text:N"
