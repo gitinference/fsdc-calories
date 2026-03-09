@@ -80,12 +80,11 @@ class DataCal(DataTrade):
             "total_iron_mg",
         ]
         df = df.with_columns(
-            **{
-                f"{x}_ecdf": pl.int_range(1, pl.len() + 1).sort_by(pl.arg_sort_by(x))
-                / pl.len()
-                for x in cols  # change df.columns to list of columns for subset only
-            }
-        )
+    **{
+        f"{x}_ecdf": pl.col(x).rank("ordinal") / pl.len()
+        for x in cols
+    }
+)
         df = df.filter(pl.col("total_fats_ecdf") < 0.9999)
         df = df.filter(pl.col("total_sugars_ecdf") < 0.9999)
         df = df.filter(pl.col("total_protein_ecdf") < 0.9999)
