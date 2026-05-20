@@ -1,26 +1,22 @@
 [project]
-name = "fsdc-server"
+name = "fsdc-calories"
 version = "0.7.1"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = [
-  "altair[all]>=5.5.0",
-  "chardet>=5.2.0",
-  "comtradeapicall>=1.2.1",
-  "fastexcel>=0.12.1",
-  "flask>=3.1.0",
-  "flask-cors>=5.0.0",
-  "ibis-framework[duckdb,geospatial,sqlite]>=9.0.0",
-  "openpyxl>=3.1.5",
-  "pandas>=2.2.3",
-  "plotly>=5.24.1",
-  "polars>=1.22.0",
-  "requests>=2.32.3",
-  "sqlmodel>=0.0.22",
-  "tqdm>=4.67.1",
-  "vegafusion[embed]>=2.0.1",
-]
+authors = [{ name = "Alejandro Ouslan", email = "alejandro.ouslan@upr.edu" }]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+fsdc-calories = "fsdc_calories:main"
+
+[build-system]
+requires = ["uv_build>=0.11.15,<0.12.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
-dev = ["jupyter>=1.1.1", "pynvim>=0.5.2"]
+dev = [
+    "jupyter>=1.1.1",
+    "pre-commit>=4.6.0",
+    "pynvim>=0.5.2",
+]
