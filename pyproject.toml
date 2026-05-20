@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alejandro Ouslan", email = "alejandro.ouslan@upr.edu" }]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "jp-imports>=1.2.0",
+]
 
 [project.scripts]
 fsdc-calories = "fsdc_calories:main"
