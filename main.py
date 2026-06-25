@@ -1,4 +1,4 @@
-from fsdc_calories import main
+from fsdc_calories import DataCal
 
 if __name__ == "__main__":
-    main()
+    print("yes")

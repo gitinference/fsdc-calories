@@ -4,31 +4,29 @@ from pathlib import Path
 
 import altair as alt
 import numpy as np
+import importlib.resources as resources
 import pandas as pd
 import polars as pl
 
-from .jp_imports.src.data.data_process import DataTrade
+from jp_imports import TradeUtils
+
 
 from .utils.constants import Constants
 from .utils.converter_utils import ConverterUtils
 
 
-class DataCal(DataTrade):
+class DataCal(TradeUtils):
     def __init__(
         self,
         saving_dir: str = "data/",
         database_file: str = "data.ddb",
-        log_file: str = "data_process.log",
     ):
         super().__init__(saving_dir, database_file, log_file)
 
     def gen_nuti_data(self) -> pl.DataFrame:
-        if not os.path.exists(f"{self.saving_dir}external/nutri_matrix.parquet"):
-            self.pull_file(
-                url="https://github.com/gitinference/fsdc-calories/raw/refs/heads/main/data/external/nutri_matrix.parquet",
-                filename=f"{self.saving_dir}external/nutri_matrix.parquet",
-            )
-        nutri_df = pl.read_parquet(f"{self.saving_dir}external/nutri_matrix.parquet")
+        nutri_df = pl.read_parquet(
+            str(resources.files("fsdc-calories").joinpath("data/nutri_matrix.parquet"))
+        )
         df = self.process_int_org(time_frame="monthly", level="hts")
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))

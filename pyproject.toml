@@ -5,7 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alejandro Ouslan", email = "alejandro.ouslan@upr.edu" }]
 requires-python = ">=3.12"
-dependencies = ["altair[all]>=6.2.1", "jp-imports>=1.2.0"]
+dependencies = [
+    "altair[all]>=6.2.1",
+    "censusforge>=0.7.1",
+    "jp-imports>=1.4.1",
+]
 
 [project.scripts]
 fsdc-calories = "fsdc_calories:main"

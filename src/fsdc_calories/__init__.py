@@ -1,7 +1,5 @@
 from importlib.metadata import version
+from .data_process import DataCal
 
 __version__ = version("fsdc_calories")
-
-
-def main() -> None:
-    print("Hello from fsdc-calories!")
+__all__ = ["DataCal"]
