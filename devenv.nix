@@ -161,7 +161,10 @@
     # 1. The Jupyter Notebook Clear Output Hook
     nixfmt.enable = true;
 
-    prettier.enable = true;
+    prettier = {
+      enable = true;
+      excludes = [ "CHANGELOG\\.md" ];
+    };
 
     jupyter-nb-clear-output = {
       enable = true;
