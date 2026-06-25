@@ -1,3 +1,0 @@
-[submodule "src/jp_imports"]
-	path = src/jp_imports
-	url = https://github.com/gitinference/jp-imports.git
