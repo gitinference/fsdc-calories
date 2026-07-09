@@ -1,5 +1,4 @@
-import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -8,26 +7,26 @@ import importlib.resources as resources
 import pandas as pd
 import polars as pl
 
-from jp_imports import TradeUtils
+from jp_imports import JPTrade
 
 
 from .utils.constants import Constants
 from .utils.converter_utils import ConverterUtils
 
 
-class DataCal(TradeUtils):
+class DataCal(JPTrade):
     def __init__(
         self,
         saving_dir: str = "data/",
         database_file: str = "data.ddb",
     ):
-        super().__init__(saving_dir, database_file, log_file)
+        super().__init__(saving_dir, database_file)
 
     def gen_nuti_data(self) -> pl.DataFrame:
         nutri_df = pl.read_parquet(
-            str(resources.files("fsdc-calories").joinpath("data/nutri_matrix.parquet"))
+            str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
         )
-        df = self.process_int_org(time_frame="monthly", level="hts")
+        df = self.process_int_jp(time_frame="monthly", level="hts")
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
 
