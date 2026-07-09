@@ -35,6 +35,8 @@ MANIFEST
 *.csv
 *.txt
 *.parquet
+*.zip
+*.xlsx
 
 # Exeption for requirements
 !requirements.txt
@@ -174,11 +176,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# ignore data folder
-data/raw/
-data/processed/
-data/external/
-data/qcew/
 # ignore mac files
 *.DS_Store
 
