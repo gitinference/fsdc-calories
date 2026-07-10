@@ -146,52 +146,70 @@ class DataCal(JPTrade):
 
         return imports, exports
 
-    def gen_plate_data(self) -> pd.DataFrame:
-
-        # Data paths
+    def gen_plate_data(self) -> pl.DataFrame:
+        # 1. Setup paths
         script_dir = Path(__file__).resolve().parent
-
         schedule_b_reference_path = (
             script_dir / ".." / "data" / "schedule_b_reference.xlsx"
         )
-        hts_data = (
-            DataTrade()
-            .process_int_org(time_frame="monthly", level="hts", agriculture_filter=True)
-            .to_pandas()
-        )
 
-        hts_data["hts_code"] = hts_data["hts_code"].astype(str)
+        # 2. Extract initial data as Polars DataFrame
+        hts_data = self.process_int_jp(time_frame="monthly", level="hts")
 
         utils = ConverterUtils(schedule_b_reference_path)
         code_to_category = utils.schedule_b_to_category()
 
-        nutrient_distribution_yearly = {}
-
-        min_year, max_year = hts_data["year"].min(), hts_data["year"].max()
-        for year in range(min_year, max_year + 1):
-            plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
-            data_current_year = hts_data[hts_data["year"] == year]
-            for index, row in data_current_year.iterrows():
-                current_code = row["hts_code"][:4].ljust(10, "0")
-                if current_code in code_to_category:
-                    plate_distribution[code_to_category[current_code]] += 1
-            # BANDAID: MOVE ICECREAM COUNT TO OTHER
-
-            plate_distribution["other"] += plate_distribution["ice_cream"]
-            plate_distribution.pop("ice_cream")
-
-            # Sort plate distribution by category
-            plate_distribution = dict(sorted(plate_distribution.items()))
-
-            nutrient_distribution_yearly[year] = plate_distribution
-
-        df = (
-            pd.DataFrame(nutrient_distribution_yearly)
-            .reset_index()
-            .rename(columns={"index": "category"})
+        # Create a lookup DataFrame from your category dictionary
+        category_lookup = pl.DataFrame(
+            {
+                "lookup_code": list(code_to_category.keys()),
+                "category": list(code_to_category.values()),
+            }
         )
-        df_long = pd.melt(df, id_vars=["category"], var_name="year", value_name="value")
-        return df_long
+
+        # 3. Vectorized string manipulation, join, and shape transformations
+        df_long = (
+            hts_data.with_columns(
+                pl.col("hts_code")
+                .cast(pl.String)
+                .str.slice(0, 4)
+                .str.pad_end(10, "0")
+                .alias("lookup_code")
+            )
+            .join(category_lookup, on="lookup_code", how="left")
+            # Compute value counts per year and category
+            .group_by(["year", "category"])
+            .agg(pl.len().alias("value"))
+            # Drop rows where category didn't match the dictionary lookup
+            .drop_nulls(subset=["category"])
+        )
+
+        # 4. Handle "ice_cream" band-aid via Polars expressions
+        # If ice_cream exists, map its value over to 'other'
+        df_long = (
+            df_long.with_columns(
+                pl.when(pl.col("category") == "ice_cream")
+                .then(pl.lit("other"))
+                .otherwise(pl.col("category"))
+                .alias("category")
+            )
+            .group_by(["year", "category"])
+            .agg(pl.col("value").sum())
+        )
+
+        # Ensure all constant food categories exist (replaces reindex logic)
+        all_cats = pl.DataFrame({"category": sorted(Constants.get_food_categories())})
+        if "ice_cream" in all_cats["category"]:
+            all_cats = all_cats.filter(pl.col("category") != "ice_cream")
+
+        unique_years = df_long.select("year").unique()
+        grid = unique_years.join(all_cats, how="cross")
+
+        df_final = grid.join(df_long, on=["year", "category"], how="left").with_columns(
+            pl.col("value").fill_null(0)
+        )
+
+        return df_final
 
     def gen_graphs_nuti_data(self):
         column_label_map = {
@@ -212,13 +230,15 @@ class DataCal(JPTrade):
         }
 
         dropdown = alt.binding_select(
-            options=column_label_map.keys(),
+            options=list(column_label_map.keys()),
+            labels=list(column_label_map.values()),
             name="Y-axis column",
-            labels=column_label_map.values(),
         )
         ycol_param = alt.param(value="total_iron_mg", bind=dropdown)
-        chart = (
-            alt.Chart(self.gen_nuti_data().sort(pl.col("datetime")))
+
+        # gen_nuti_data() is sorted directly via Polars native expressions
+        return (
+            alt.Chart(self.gen_nuti_data().sort("datetime"))
             .mark_line()
             .encode(x="datetime:T", y=alt.Y("y:Q").title(""))
             .transform_calculate(y=f"datum[{ycol_param.name}]")
@@ -226,25 +246,28 @@ class DataCal(JPTrade):
             .properties(width="container")
         )
 
-        return chart
-
     def gen_graphs_price_change(self) -> alt.HConcatChart:
-        imports, exports = self.gen_price_rankings()
+        imports, _ = self.gen_price_rankings()
 
-        # Limit to top 10 for each dataframe
-        top = imports.head(10)
-        bottom = imports.tail(10)
-        imports = pd.concat([top, bottom], ignore_index=True, sort=False)
+        # Slice top 10 and bottom 10 cleanly using Polars explicit head/tail concat
+        imports = pl.concat([imports.head(10), imports.tail(10)])
 
-        df = self.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
-        df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
-        df["hs4"] = df["hts_code"].str.slice(stop=4)
-        df = df.drop_duplicates(subset=["hs4"]).reset_index(drop=True)
-        df = df[["hs4", "hts_desc"]]
+        # Query DuckDB or your SQL connection directly into a Polars DataFrame
+        df_lookup = pl.from_dataframe(
+            self.conn.sql("SELECT DISTINCT hts_code, hts_desc FROM 'inttradedata'").df()
+        )
 
-        df = imports.join(df.set_index("hs4"), on="hs4")
+        # Isolate hs4 substring, drop duplicate records, and trim text column
+        df_lookup = (
+            df_lookup.with_columns(pl.col("hts_code").str.slice(0, 4).alias("hs4"))
+            .unique(subset=["hs4"])
+            .with_columns(pl.col("hts_desc").str.slice(0, 30))
+        )
 
-        imports_chart = (
+        # Standard left-join
+        df = imports.join(df_lookup.select(["hs4", "hts_desc"]), on="hs4", how="left")
+
+        return (
             alt.Chart(df)
             .mark_bar()
             .encode(
@@ -254,33 +277,78 @@ class DataCal(JPTrade):
             .properties(width="container", title="Imports")
         )
 
-        return imports_chart
-
     def gen_graphs_plate(self) -> alt.Chart:
-        plate_data: pd.DataFrame = self.gen_plate_data()
+        # 1. Load data directly into Polars
+        hts_data = self.process_int_jp(time_frame="monthly", level="hts")
 
-        # Calculate percent of category for each year
-        plate_data["pct"] = (
-            plate_data["value"]
-            / plate_data.groupby(by="year")["value"].transform("sum")
-            * 100
-        ).round(1)
+        parquet_path = Path("data/external/schedule_b_reference")
+        ref_df = pl.read_parquet(parquet_path)
 
-        # Bandaid: Prefix each pct value with % for chart display
-        plate_data["pct_text"] = plate_data["pct"].astype(str) + "%"
-
-        valid_years = [
-            year
-            for year in range(plate_data["year"].min(), plate_data["year"].max() + 1)
+        # 2. Extract Category from Matrix
+        available_cats = [
+            c for c in Constants.get_food_categories() if c in ref_df.columns
         ]
-        valid_years.reverse()
 
-        max_year = max(valid_years)
+        category_expr = pl.coalesce(
+            [
+                pl.when(pl.col(c).cast(pl.String) == "1").then(pl.lit(c))
+                for c in available_cats
+            ]
+        ).fill_null("other")
+
+        lookup_map = (
+            ref_df.with_columns(
+                pl.col("schedule_b").cast(pl.String).str.pad_end(10, "0")
+            )
+            .select(["schedule_b", category_expr.alias("category")])
+            .drop_nulls()
+        )
+
+        # 3. Match codes, aggregate totals, apply ice_cream band-aid, and FILTER OUT 'other'
+        plate_data = (
+            hts_data.with_columns(
+                pl.col("hts_code")
+                .cast(pl.String)
+                .str.slice(0, 4)
+                .str.pad_end(10, "0")
+                .alias("schedule_b")
+            )
+            .join(lookup_map, on="schedule_b", how="left")
+            .with_columns(pl.col("category").fill_null("other"))
+            # Fold ice_cream into other
+            .with_columns(
+                pl.when(pl.col("category") == "ice_cream")
+                .then(pl.lit("other"))
+                .otherwise(pl.col("category"))
+            )
+            .group_by(["year", "category"])
+            .agg(pl.len().alias("value"))
+            # --- NEW: Drop "other" rows before calculating percentages ---
+            .filter(pl.col("category") != "other")
+        )
+
+        # 4. Compute structural percentages over the remaining real food categories
+        plate_data = plate_data.with_columns(
+            (pl.col("value") / pl.col("value").sum().over("year") * 100)
+            .round(1)
+            .alias("pct")
+        ).with_columns((pl.col("pct").cast(pl.String) + "%").alias("pct_text"))
+
+        # 5. Dropdown selections configurations
+        valid_years = (
+            plate_data.select("year")
+            .unique()
+            .sort("year", descending=True)["year"]
+            .to_list()
+        )
+        max_year = valid_years[0] if valid_years else 2026
+
         year_dropdown = alt.binding_select(options=valid_years, name="Year")
         year_select = alt.selection_point(
             fields=["year"], bind=year_dropdown, value=max_year - 1
         )
 
+        # 6. Render the layout
         base = (
             alt.Chart(plate_data)
             .encode(
@@ -289,11 +357,10 @@ class DataCal(JPTrade):
             )
             .add_params(year_select)
             .transform_filter(year_select)
-            .properties(title="Yearly MyPlate Nutrient Distribution")
+            .properties(title="Yearly MyPlate Nutrient Distribution (Excluding 'Other')")
         )
 
         c1 = base.mark_arc(outerRadius=100, stroke="#fff")
-
         c2 = base.mark_text(radius=100, radiusOffset=15, size=10).encode(
             text="pct_text:N"
         )
