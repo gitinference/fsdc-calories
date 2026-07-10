@@ -9,8 +9,12 @@ jobs:
   Build-And-Publish:
     runs-on: local
     steps:
+      - name: Install xz and Node.js
+        run: |
+          apt-get update
+          apt-get install -y nodejs curl xz-utils
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: https://github.com/actions/checkout.git@v4
 
       - name: Install uv
         # This installs the standalone uv binary
