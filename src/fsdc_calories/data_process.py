@@ -278,16 +278,39 @@ class DataCal(JPTrade):
         )
 
     def gen_graphs_plate(self) -> alt.Chart:
-        # 1. Load data directly into Polars
-        hts_data = self.process_int_jp(time_frame="monthly", level="hts")
+        """
+        Generates a production-grade, interactive donut chart showing the
+        yearly food category distribution.
+
+        Returns:
+            alt.Chart: An interactive Altair chart configuration.
+        """
+        # ---------------------------------------------------------
+        # 1. Data Ingestion & Validation
+        # ---------------------------------------------------------
+        try:
+            hts_data = self.process_int_jp(time_frame="monthly", level="hts")
+        except Exception as e:
+            logger.error(f"Failed to process internal JP data: {e}")
+            return alt.Chart()
 
         parquet_path = Path("data/external/schedule_b_reference")
+        if not parquet_path.exists():
+            logger.error(f"Reference file not found at path: {parquet_path}")
+            return alt.Chart()
+
         ref_df = pl.read_parquet(parquet_path)
 
-        # 2. Extract Category from Matrix
+        # ---------------------------------------------------------
+        # 2. Extract Categories & Build Lookup Map
+        # ---------------------------------------------------------
         available_cats = [
             c for c in Constants.get_food_categories() if c in ref_df.columns
         ]
+
+        if not available_cats:
+            logger.warning("No food categories found matching the reference schema.")
+            return alt.Chart()
 
         category_expr = pl.coalesce(
             [
@@ -304,8 +327,11 @@ class DataCal(JPTrade):
             .drop_nulls()
         )
 
-        # 3. Match codes, aggregate totals, apply ice_cream band-aid, and FILTER OUT 'other'
-        plate_data = (
+        # ---------------------------------------------------------
+        # 3. Join, Aggregate, and Compute Percentages
+        # ---------------------------------------------------------
+        # Process core metrics completely inside Polars
+        processed_data = (
             hts_data.with_columns(
                 pl.col("hts_code")
                 .cast(pl.String)
@@ -315,54 +341,102 @@ class DataCal(JPTrade):
             )
             .join(lookup_map, on="schedule_b", how="left")
             .with_columns(pl.col("category").fill_null("other"))
-            # Fold ice_cream into other
+            # Consolidate 'ice_cream' and strip out 'other'
             .with_columns(
                 pl.when(pl.col("category") == "ice_cream")
                 .then(pl.lit("other"))
                 .otherwise(pl.col("category"))
             )
+            .filter(pl.col("category") != "other")
             .group_by(["year", "category"])
             .agg(pl.len().alias("value"))
-            # --- NEW: Drop "other" rows before calculating percentages ---
-            .filter(pl.col("category") != "other")
+            # Calculate localized window percentage
+            .with_columns(
+                (pl.col("value") / pl.col("value").sum().over("year") * 100)
+                .round(1)
+                .alias("pct")
+            )
+            .with_columns(
+                (pl.col("pct").cast(pl.String) + "%").alias("pct_text"),
+                pl.col("category").str.to_titlecase().alias("category_clean"),
+            )
         )
 
-        # 4. Compute structural percentages over the remaining real food categories
-        plate_data = plate_data.with_columns(
-            (pl.col("value") / pl.col("value").sum().over("year") * 100)
-            .round(1)
-            .alias("pct")
-        ).with_columns((pl.col("pct").cast(pl.String) + "%").alias("pct_text"))
-
-        # 5. Dropdown selections configurations
+        # ---------------------------------------------------------
+        # 4. Interactive Parameters Setup
+        # ---------------------------------------------------------
+        # Safely extract unique years for dropdown tracking
         valid_years = (
-            plate_data.select("year")
+            processed_data.select("year")
             .unique()
             .sort("year", descending=True)["year"]
             .to_list()
         )
-        max_year = valid_years[0] if valid_years else 2026
 
-        year_dropdown = alt.binding_select(options=valid_years, name="Year")
+        if not valid_years:
+            logger.warning("Processed dataset yielded zero usable records.")
+            return alt.Chart()
+
+        max_year = valid_years[0]
+        default_year = valid_years[1] if len(valid_years) > 1 else max_year
+
+        year_dropdown = alt.binding_select(options=valid_years, name="Select Year: ")
         year_select = alt.selection_point(
-            fields=["year"], bind=year_dropdown, value=max_year - 1
+            fields=["year"], bind=year_dropdown, value=default_year
         )
 
-        # 6. Render the layout
+        # Convert the slim, finalized dataframe to pandas for Altair compatibility
+        chart_df = processed_data.to_pandas()
+
+        # ---------------------------------------------------------
+        # 5. Professional Visualization Assembly
+        # ---------------------------------------------------------
         base = (
-            alt.Chart(plate_data)
+            alt.Chart(chart_df)
             .encode(
                 theta=alt.Theta("pct:Q").stack(True),
-                color=alt.Color("category"),
+                color=alt.Color(
+                    "category_clean:N",
+                    scale=alt.Scale(scheme="tableau10"),
+                    legend=alt.Legend(title="Food Category", orient="right"),
+                ),
+                tooltip=[
+                    alt.Tooltip("category_clean:N", title="Category"),
+                    alt.Tooltip("year:O", title="Year"),
+                    alt.Tooltip("value:Q", title="Count", format=","),
+                    alt.Tooltip("pct_text:N", title="Share"),
+                ],
             )
             .add_params(year_select)
             .transform_filter(year_select)
-            .properties(title="Yearly MyPlate Nutrient Distribution (Excluding 'Other')")
         )
 
-        c1 = base.mark_arc(outerRadius=100, stroke="#fff")
-        c2 = base.mark_text(radius=100, radiusOffset=15, size=10).encode(
-            text="pct_text:N"
+        # Convert pie chart to a modern, crisp donut chart layout
+        chart_arc = base.mark_arc(
+            innerRadius=60, outerRadius=110, stroke="#fff", strokeWidth=2
         )
 
-        return c1 + c2
+        # Clean text placement avoiding visual overlaps
+        chart_text = base.mark_text(
+            radius=130, size=11, font="Sans-Serif", fontWeight="bold"
+        ).encode(text="pct_text:N")
+
+        # Layer, style, and global configuration definitions
+        return (
+            (chart_arc + chart_text)
+            .properties(
+                title=alt.TitleParams(
+                    text="Yearly Food Category Distribution",
+                    subtitle=[
+                        "Structural macro-nutrient trends (Excluding 'Other' classifications)"
+                    ],
+                    fontSize=16,
+                    subtitleFontSize=12,
+                    anchor="start",
+                    color="#2c3e50",
+                ),
+                width=400,
+                height=350,
+            )
+            .configure_view(strokeWidth=0)  # Removes ugly bounding chart boxes
+        )
