@@ -13,6 +13,13 @@ from jp_imports import JPTrade
 from .utils.constants import Constants
 from .utils.converter_utils import ConverterUtils
 
+TIME_GROUPS = {
+    "yearly": ["year"],
+    "fiscal": ["fiscal_year"],
+    "qtr": ["year", "qtr"],
+    "monthly": ["year", "month"],
+}
+
 
 class DataCal(JPTrade):
     def __init__(
@@ -22,66 +29,74 @@ class DataCal(JPTrade):
     ):
         super().__init__(saving_dir, database_file)
 
-    def gen_nuti_data(self) -> pl.DataFrame:
+    def gen_nuti_data(self, time_frame: str = "fiscal") -> pl.DataFrame:
+        """
+        Generate nutrition data dynamically aggregated across different timeframes.
+        """
+        # 1. Load nutrition matrix
         nutri_df = pl.read_parquet(
             str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
         )
-        df = self.process_int_jp(time_frame="monthly", level="hts")
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
-        df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
+        nutri_df = nutri_df.unique(subset="hts_code", keep="first")
 
-        df = df.join(nutri_df, on="hts_code", how="inner")
+        # 2. Pull trade data using the dynamic timeframe
+        df = self.process_int_jp(time_frame=time_frame, level="hts")
+
+        # 3. Match HTS lengths (slicing down to 4 digits to match nutri matrix)
+        df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
+        df = df.join(nutri_df, on="hts_code", how="inner", validate="m:1")
+
+        # 4. Compute metrics using a list comprehension to avoid repetitive code
         df = df.with_columns(net_qty=pl.col("imports_qty") - pl.col("exports_qty"))
-        df = df.with_columns(
-            total_calories=pl.col("net_qty") * pl.col("calories"),
-            total_fats=pl.col("net_qty") * pl.col("fats"),
-            total_sugars=pl.col("net_qty") * pl.col("sugars"),
-            total_protein=pl.col("net_qty") * pl.col("protein"),
-            total_saturated_fat_g=pl.col("net_qty") * pl.col("saturated_fat_g"),
-            total_cholesterol_mg=pl.col("net_qty") * pl.col("cholesterol_mg"),
-            total_sodium_mg=pl.col("net_qty") * pl.col("sodium_mg"),
-            total_carbohydrate_g=pl.col("net_qty") * pl.col("carbohydrate_g"),
-            total_fiber_g=pl.col("net_qty") * pl.col("fiber_g"),
-            total_sugar_g=pl.col("net_qty") * pl.col("sugar_g"),
-            total_vitamin_d_iu=pl.col("net_qty") * pl.col("vitamin_d_iu"),
-            total_calcium_mg=pl.col("net_qty") * pl.col("calcium_mg"),
-            total_potassium_mg=pl.col("net_qty") * pl.col("potassium_mg"),
-            total_iron_mg=pl.col("net_qty") * pl.col("iron_mg"),
-        )
-        cols = [
-            "total_calories",
-            "total_fats",
-            "total_sugars",
-            "total_protein",
-            "total_saturated_fat_g",
-            "total_cholesterol_mg",
-            "total_sodium_mg",
-            "total_carbohydrate_g",
-            "total_fiber_g",
-            "total_sugar_g",
-            "total_vitamin_d_iu",
-            "total_calcium_mg",
-            "total_potassium_mg",
-            "total_iron_mg",
+
+        base_nutri_cols = [
+            "calories",
+            "fats",
+            "sugars",
+            "protein",
+            "saturated_fat_g",
+            "cholesterol_mg",
+            "sodium_mg",
+            "carbohydrate_g",
+            "fiber_g",
+            "sugar_g",
+            "vitamin_d_iu",
+            "calcium_mg",
+            "potassium_mg",
+            "iron_mg",
         ]
+
+        # Calculate totals for all nutritional columns simultaneously
         df = df.with_columns(
-            **{f"{x}_ecdf": pl.col(x).rank("ordinal") / pl.len() for x in cols}
+            [
+                (pl.col(col) * pl.col("net_qty")).alias(f"total_{col}")
+                for col in base_nutri_cols
+            ]
         )
-        df = df.filter(pl.col("total_fats_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_sugars_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_protein_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_saturated_fat_g_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_sodium_mg_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_cholesterol_mg_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_carbohydrate_g_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_fiber_g_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_sugar_g_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_vitamin_d_iu_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_calcium_mg_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_potassium_mg_ecdf") < 0.9999)
-        df = df.filter(pl.col("total_iron_mg_ecdf") < 0.9999)
-        df = df.group_by(["year", "month"]).agg(pl.col(cols).sum())
-        df = df.with_columns(datetime=pl.datetime(pl.col("year"), pl.col("month"), 1))
+
+        # 5. Apply Empirical Cumulative Distribution Function (ECDF) filters
+        # (Excluding total_calories as per your original logic)
+        filter_cols = [f"total_{col}" for col in base_nutri_cols if col != "calories"]
+
+        df = df.with_columns(
+            [
+                (pl.col(col).rank("ordinal") / pl.len()).alias(f"{col}_ecdf")
+                for col in filter_cols
+            ]
+        )
+
+        # Combine all filters into a single call (Polars evaluates commas as AND)
+        df = df.filter([pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols])
+
+        # 6. Dynamically resolve group-by columns based on time_frame
+        # Note: Make sure TIME_GROUPS is imported into this package file
+        time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
+        group_keys = time_cols + ["hts_code"]
+
+        # 7. Final aggregation
+        total_cols = [f"total_{col}" for col in base_nutri_cols]
+        df = df.group_by(group_keys).agg([pl.col(col).sum() for col in total_cols])
 
         return df
 
