@@ -11,6 +11,7 @@ from jp_imports import JPTrade
 
 from .utils.constants import Constants
 
+# alt.data_transformers.enable("vegafusion")
 logger = logging.getLogger(__name__)
 
 TIME_GROUPS = {
@@ -96,6 +97,11 @@ class DataCal(JPTrade):
         # 7. Final aggregation
         total_cols = [f"total_{col}" for col in base_nutri_cols]
         df = df.group_by(group_keys).agg([pl.col(col).sum() for col in total_cols])
+
+        if time_frame == "monthly":
+            df = df.with_columns(
+                datetime=pl.datetime(pl.col("year"), pl.col("month"), 1)
+            )
 
         return df
 
@@ -192,7 +198,8 @@ class DataCal(JPTrade):
         df_long = pd.melt(df, id_vars=["category"], var_name="year", value_name="value")
         return df_long
 
-    def gen_graphs_nuti_data(self):
+    def gen_graphs_nuti_data(self) -> alt.Chart:
+        """Generates an interactive line chart tracking nutritional metrics over time."""
         column_label_map = {
             "total_calories": "Calories",
             "total_fats": "Fats",
@@ -204,59 +211,210 @@ class DataCal(JPTrade):
             "total_carbohydrate_g": "Carbohydrates (g)",
             "total_fiber_g": "Fibers (g)",
             "total_sugar_g": "Sugars (g)",
-            "total_vitamin_d_iu": "Vitam D (iu)",
+            "total_vitamin_d_iu": "Vitamin D (IU)",
             "total_calcium_mg": "Calcium (mg)",
             "total_potassium_mg": "Potassium (mg)",
             "total_iron_mg": "Iron (mg)",
         }
 
-        dropdown = alt.binding_select(
-            options=column_label_map.keys(),
-            name="Y-axis column",
-            labels=column_label_map.values(),
-        )
-        ycol_param = alt.param(value="total_iron_mg", bind=dropdown)
-        chart = (
-            alt.Chart(self.gen_nuti_data().sort(pl.col("datetime")))
-            .mark_line()
-            .encode(x="datetime:T", y=alt.Y("y:Q").title(""))
-            .transform_calculate(y=f"datum[{ycol_param.name}]")
-            .add_params(ycol_param)
-            .properties(width="container")
+        # 1. Pre-aggregate data using Polars
+        data = (
+            self.gen_nuti_data(time_frame="monthly")
+            .group_by("datetime")
+            .agg([pl.col(c).sum() for c in column_label_map.keys()])
+            .sort("datetime")
+            .to_pandas()
         )
 
-        return chart
+        if data.empty:
+            return alt.Chart(data).mark_text(text="No data available")
+
+        # 2. Dropdown binding parameter
+        dropdown = alt.binding_select(
+            options=list(column_label_map.keys()),
+            labels=list(column_label_map.values()),
+            name="Nutrient: ",
+        )
+        ycol_param = alt.param(
+            name="selected_metric", value="total_iron_mg", bind=dropdown
+        )
+
+        # 3. Selection parameter for interactive hover tooltips
+        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
+
+        # 4. Base chart with calculated field
+        base = (
+            alt.Chart(data)
+            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
+            .add_params(ycol_param)
+        )
+
+        # 5. Primary line chart
+        line = base.mark_line(
+            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
+        ).encode(
+            x=alt.X(
+                "datetime:T", title="Date", axis=alt.Axis(format="%b %Y", grid=False)
+            ),
+            y=alt.Y(
+                "selected_value:Q",
+                title=None,
+                axis=alt.Axis(
+                    format="~s",  # <--- Formats numbers like 1M, 2B, 500k
+                    gridDash=[2, 2],
+                    gridColor="#E0E0E0",
+                ),
+            ),
+        )
+
+        # 6. Interactive hover points & tooltips
+        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
+            x="datetime:T",
+            y="selected_value:Q",
+            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
+            tooltip=[
+                alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
+                alt.Tooltip(
+                    "selected_value:Q",
+                    title="Value",
+                    format="~s",  # <--- Formats tooltip values to M/B/k
+                ),
+            ],
+        )
+
+        # Invisible rule selector for better hover snapping
+        selectors = (
+            base.mark_rule(opacity=0).encode(x="datetime:T").add_params(hover_select)
+        )
+
+        # 7. Combine layers & apply production styling
+        final_chart = (
+            alt.layer(line, points, selectors)
+            .properties(
+                width="container",
+                height=380,
+                title=alt.TitleParams(
+                    text="Nutritional Intake Over Time",
+                    subtitle="Select a nutrient from the dropdown menu below to update the view.",
+                    fontSize=16,
+                    subtitleFontSize=12,
+                    anchor="start",
+                ),
+            )
+            .configure_view(strokeWidth=0)
+            .configure_axis(labelFontSize=11, titleFontSize=12)
+        )
+
+        return final_chart
 
     def gen_graphs_price_change(self) -> alt.HConcatChart:
-        imports, exports = self.gen_price_rankings()
+        """Generates a side-by-side bar chart showing the largest price changes
 
-        # Limit to top 10 for each dataframe
-        top = imports.head(10)
-        bottom = imports.tail(10)
-        imports = pd.concat([top, bottom], ignore_index=True, sort=False)
+        (top 10 increases & bottom 10 decreases) for both Imports and Exports.
 
-        # df = self.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
-        df = self.conn.execute(
-            f"SELECT DISTINCT hts_code,hts_desc FROM '{self.saving_dir}/raw/jp_data.parquet'"
-        ).df()
-        df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
-        df["hs4"] = df["hts_code"].str.slice(stop=4)
-        df = df.drop_duplicates(subset=["hs4"]).reset_index(drop=True)
-        df = df[["hs4", "hts_desc"]]
+        Returns:
+            alt.HConcatChart: Horizontally concatenated Altair chart.
+        """
+        # 1. Fetch ranking data
+        imports_df, exports_df = self.gen_price_rankings()
 
-        df = imports.join(df.set_index("hs4"), on="hs4")
+        # 2. Query commodity descriptions from DuckDB safely
+        query = f"""
+            SELECT DISTINCT 
+                SUBSTRING(hts_code, 1, 4) AS hs4,
+                SUBSTRING(hts_desc, 1, 30) AS hts_desc
+            FROM '{self.saving_dir}/raw/jp_data.parquet'
+        """
+        desc_df = self.conn.execute(query).df()
+        desc_df = desc_df.drop_duplicates(subset=["hs4"])
 
-        imports_chart = (
-            alt.Chart(df)
-            .mark_bar()
-            .encode(
-                x=alt.X("pct_change").axis(format="%", title="Change in price"),
-                y=alt.Y("hts_desc").sort("-x").axis(title="HS4"),
+        def process_and_build_chart(df: pd.DataFrame, title_text: str) -> alt.Chart:
+            """Helper to deduplicate top/bottom records, join descriptions, and build chart."""
+            if df.empty:
+                return alt.Chart(pd.DataFrame()).mark_text(text=f"No {title_text} Data")
+
+            # Select Top 10 and Bottom 10 without duplicate overlap if total rows < 20
+            top = df.head(10)
+            bottom = df.tail(10)
+            combined = pd.concat([top, bottom], ignore_index=True).drop_duplicates()
+
+            # Join descriptions on 'hs4'
+            merged = combined.merge(desc_df, on="hs4", how="left")
+            merged["hts_desc"] = merged["hts_desc"].fillna("Unknown Commodity")
+
+            # Add visual helper column for color encoding (positive vs negative change)
+            merged["change_type"] = merged["pct_change"].apply(
+                lambda x: "Increase" if x >= 0 else "Decrease"
             )
-            .properties(width="container", title="Imports")
+
+            # Build chart layer
+            chart = (
+                alt.Chart(merged)
+                .mark_bar(cornerRadiusEnd=3)
+                .encode(
+                    x=alt.X(
+                        "pct_change:Q",
+                        title="Price Change",
+                        axis=alt.Axis(format="+.1%", grid=True, gridDash=[2, 2]),
+                    ),
+                    y=alt.Y(
+                        "hts_desc:N",
+                        title=None,
+                        sort=alt.EncodingSortField(
+                            field="pct_change", order="descending"
+                        ),
+                        axis=alt.Axis(labelLimit=200),
+                    ),
+                    color=alt.Color(
+                        "change_type:N",
+                        scale=alt.Scale(
+                            domain=["Increase", "Decrease"],
+                            range=[
+                                "#4daf4a",
+                                "#e41a1c",
+                            ],  # Red for increase, Green for decrease
+                        ),
+                        legend=None,
+                    ),
+                    tooltip=[
+                        alt.Tooltip("hs4:N", title="HS4 Code"),
+                        alt.Tooltip("hts_desc:N", title="Description"),
+                        alt.Tooltip("pct_change:Q", title="Change", format="+.2%"),
+                    ],
+                )
+                .properties(
+                    width=320,
+                    height=350,
+                    title=alt.TitleParams(
+                        text=title_text,
+                        fontSize=14,
+                        anchor="start",
+                    ),
+                )
+            )
+
+            # Add reference zero-line for clear visual separation
+            rule = (
+                alt.Chart(pd.DataFrame({"x": [0]}))
+                .mark_rule(color="#666666", strokeDash=[2, 2])
+                .encode(x="x:Q")
+            )
+
+            return alt.layer(chart, rule)
+
+        # 3. Process both Imports and Exports
+        imports_chart = process_and_build_chart(imports_df, "Imports")
+        exports_chart = process_and_build_chart(exports_df, "Exports")
+
+        # 4. Concatenate side-by-side with shared configurations
+        final_chart = (
+            alt.hconcat(imports_chart, exports_chart)
+            .resolve_scale(y="independent")  # Keep distinct category labels per chart
+            .configure_view(strokeWidth=0)
+            .configure_axis(labelFontSize=10, titleFontSize=11)
         )
 
-        return imports_chart
+        return final_chart
 
     def gen_graphs_plate(self) -> alt.Chart:
         """
