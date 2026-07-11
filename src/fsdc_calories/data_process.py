@@ -1,17 +1,17 @@
-from datetime import date, timedelta
+import importlib.resources as resources
+import logging
 from pathlib import Path
 
 import altair as alt
+from datetime import date, timedelta
 import numpy as np
-import importlib.resources as resources
-import pandas as pd
 import polars as pl
-
+import pandas as pd
 from jp_imports import JPTrade
 
-
 from .utils.constants import Constants
-from .utils.converter_utils import ConverterUtils
+
+logger = logging.getLogger(__name__)
 
 TIME_GROUPS = {
     "yearly": ["year"],
@@ -90,7 +90,6 @@ class DataCal(JPTrade):
         df = df.filter([pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols])
 
         # 6. Dynamically resolve group-by columns based on time_frame
-        # Note: Make sure TIME_GROUPS is imported into this package file
         time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
         group_keys = time_cols + ["hts_code"]
 
@@ -146,70 +145,52 @@ class DataCal(JPTrade):
 
         return imports, exports
 
-    def gen_plate_data(self) -> pl.DataFrame:
-        # 1. Setup paths
+    def gen_plate_data(self) -> pd.DataFrame:
+
+        # Data paths
         script_dir = Path(__file__).resolve().parent
+
         schedule_b_reference_path = (
             script_dir / ".." / "data" / "schedule_b_reference.xlsx"
         )
+        hts_data = (
+            DataTrade()
+            .process_int_org(time_frame="monthly", level="hts", agriculture_filter=True)
+            .to_pandas()
+        )
 
-        # 2. Extract initial data as Polars DataFrame
-        hts_data = self.process_int_jp(time_frame="monthly", level="hts")
+        hts_data["hts_code"] = hts_data["hts_code"].astype(str)
 
         utils = ConverterUtils(schedule_b_reference_path)
         code_to_category = utils.schedule_b_to_category()
 
-        # Create a lookup DataFrame from your category dictionary
-        category_lookup = pl.DataFrame(
-            {
-                "lookup_code": list(code_to_category.keys()),
-                "category": list(code_to_category.values()),
-            }
+        nutrient_distribution_yearly = {}
+
+        min_year, max_year = hts_data["year"].min(), hts_data["year"].max()
+        for year in range(min_year, max_year + 1):
+            plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
+            data_current_year = hts_data[hts_data["year"] == year]
+            for index, row in data_current_year.iterrows():
+                current_code = row["hts_code"][:4].ljust(10, "0")
+                if current_code in code_to_category:
+                    plate_distribution[code_to_category[current_code]] += 1
+            # BANDAID: MOVE ICECREAM COUNT TO OTHER
+
+            plate_distribution["other"] += plate_distribution["ice_cream"]
+            plate_distribution.pop("ice_cream")
+
+            # Sort plate distribution by category
+            plate_distribution = dict(sorted(plate_distribution.items()))
+
+            nutrient_distribution_yearly[year] = plate_distribution
+
+        df = (
+            pd.DataFrame(nutrient_distribution_yearly)
+            .reset_index()
+            .rename(columns={"index": "category"})
         )
-
-        # 3. Vectorized string manipulation, join, and shape transformations
-        df_long = (
-            hts_data.with_columns(
-                pl.col("hts_code")
-                .cast(pl.String)
-                .str.slice(0, 4)
-                .str.pad_end(10, "0")
-                .alias("lookup_code")
-            )
-            .join(category_lookup, on="lookup_code", how="left")
-            # Compute value counts per year and category
-            .group_by(["year", "category"])
-            .agg(pl.len().alias("value"))
-            # Drop rows where category didn't match the dictionary lookup
-            .drop_nulls(subset=["category"])
-        )
-
-        # 4. Handle "ice_cream" band-aid via Polars expressions
-        # If ice_cream exists, map its value over to 'other'
-        df_long = (
-            df_long.with_columns(
-                pl.when(pl.col("category") == "ice_cream")
-                .then(pl.lit("other"))
-                .otherwise(pl.col("category"))
-                .alias("category")
-            )
-            .group_by(["year", "category"])
-            .agg(pl.col("value").sum())
-        )
-
-        # Ensure all constant food categories exist (replaces reindex logic)
-        all_cats = pl.DataFrame({"category": sorted(Constants.get_food_categories())})
-        if "ice_cream" in all_cats["category"]:
-            all_cats = all_cats.filter(pl.col("category") != "ice_cream")
-
-        unique_years = df_long.select("year").unique()
-        grid = unique_years.join(all_cats, how="cross")
-
-        df_final = grid.join(df_long, on=["year", "category"], how="left").with_columns(
-            pl.col("value").fill_null(0)
-        )
-
-        return df_final
+        df_long = pd.melt(df, id_vars=["category"], var_name="year", value_name="value")
+        return df_long
 
     def gen_graphs_nuti_data(self):
         column_label_map = {
@@ -230,15 +211,13 @@ class DataCal(JPTrade):
         }
 
         dropdown = alt.binding_select(
-            options=list(column_label_map.keys()),
-            labels=list(column_label_map.values()),
+            options=column_label_map.keys(),
             name="Y-axis column",
+            labels=column_label_map.values(),
         )
         ycol_param = alt.param(value="total_iron_mg", bind=dropdown)
-
-        # gen_nuti_data() is sorted directly via Polars native expressions
-        return (
-            alt.Chart(self.gen_nuti_data().sort("datetime"))
+        chart = (
+            alt.Chart(self.gen_nuti_data().sort(pl.col("datetime")))
             .mark_line()
             .encode(x="datetime:T", y=alt.Y("y:Q").title(""))
             .transform_calculate(y=f"datum[{ycol_param.name}]")
@@ -246,28 +225,28 @@ class DataCal(JPTrade):
             .properties(width="container")
         )
 
+        return chart
+
     def gen_graphs_price_change(self) -> alt.HConcatChart:
-        imports, _ = self.gen_price_rankings()
+        imports, exports = self.gen_price_rankings()
 
-        # Slice top 10 and bottom 10 cleanly using Polars explicit head/tail concat
-        imports = pl.concat([imports.head(10), imports.tail(10)])
+        # Limit to top 10 for each dataframe
+        top = imports.head(10)
+        bottom = imports.tail(10)
+        imports = pd.concat([top, bottom], ignore_index=True, sort=False)
 
-        # Query DuckDB or your SQL connection directly into a Polars DataFrame
-        df_lookup = pl.from_dataframe(
-            self.conn.sql("SELECT DISTINCT hts_code, hts_desc FROM 'inttradedata'").df()
-        )
+        # df = self.conn.sql("SELECT DISTINCT hts_code,hts_desc FROM 'inttradedata'").df()
+        df = self.conn.execute(
+            f"SELECT DISTINCT hts_code,hts_desc FROM '{self.saving_dir}/raw/jp_data.parquet'"
+        ).df()
+        df["hts_desc"] = df["hts_desc"].str.slice(stop=30)
+        df["hs4"] = df["hts_code"].str.slice(stop=4)
+        df = df.drop_duplicates(subset=["hs4"]).reset_index(drop=True)
+        df = df[["hs4", "hts_desc"]]
 
-        # Isolate hs4 substring, drop duplicate records, and trim text column
-        df_lookup = (
-            df_lookup.with_columns(pl.col("hts_code").str.slice(0, 4).alias("hs4"))
-            .unique(subset=["hs4"])
-            .with_columns(pl.col("hts_desc").str.slice(0, 30))
-        )
+        df = imports.join(df.set_index("hs4"), on="hs4")
 
-        # Standard left-join
-        df = imports.join(df_lookup.select(["hs4", "hts_desc"]), on="hs4", how="left")
-
-        return (
+        imports_chart = (
             alt.Chart(df)
             .mark_bar()
             .encode(
@@ -276,6 +255,8 @@ class DataCal(JPTrade):
             )
             .properties(width="container", title="Imports")
         )
+
+        return imports_chart
 
     def gen_graphs_plate(self) -> alt.Chart:
         """
@@ -330,7 +311,6 @@ class DataCal(JPTrade):
         # ---------------------------------------------------------
         # 3. Join, Aggregate, and Compute Percentages
         # ---------------------------------------------------------
-        # Process core metrics completely inside Polars
         processed_data = (
             hts_data.with_columns(
                 pl.col("hts_code")
@@ -341,7 +321,6 @@ class DataCal(JPTrade):
             )
             .join(lookup_map, on="schedule_b", how="left")
             .with_columns(pl.col("category").fill_null("other"))
-            # Consolidate 'ice_cream' and strip out 'other'
             .with_columns(
                 pl.when(pl.col("category") == "ice_cream")
                 .then(pl.lit("other"))
@@ -350,7 +329,6 @@ class DataCal(JPTrade):
             .filter(pl.col("category") != "other")
             .group_by(["year", "category"])
             .agg(pl.len().alias("value"))
-            # Calculate localized window percentage
             .with_columns(
                 (pl.col("value") / pl.col("value").sum().over("year") * 100)
                 .round(1)
@@ -365,7 +343,6 @@ class DataCal(JPTrade):
         # ---------------------------------------------------------
         # 4. Interactive Parameters Setup
         # ---------------------------------------------------------
-        # Safely extract unique years for dropdown tracking
         valid_years = (
             processed_data.select("year")
             .unique()
@@ -385,7 +362,6 @@ class DataCal(JPTrade):
             fields=["year"], bind=year_dropdown, value=default_year
         )
 
-        # Convert the slim, finalized dataframe to pandas for Altair compatibility
         chart_df = processed_data.to_pandas()
 
         # ---------------------------------------------------------
@@ -411,17 +387,14 @@ class DataCal(JPTrade):
             .transform_filter(year_select)
         )
 
-        # Convert pie chart to a modern, crisp donut chart layout
         chart_arc = base.mark_arc(
             innerRadius=60, outerRadius=110, stroke="#fff", strokeWidth=2
         )
 
-        # Clean text placement avoiding visual overlaps
         chart_text = base.mark_text(
             radius=130, size=11, font="Sans-Serif", fontWeight="bold"
         ).encode(text="pct_text:N")
 
-        # Layer, style, and global configuration definitions
         return (
             (chart_arc + chart_text)
             .properties(
@@ -438,5 +411,5 @@ class DataCal(JPTrade):
                 width=400,
                 height=350,
             )
-            .configure_view(strokeWidth=0)  # Removes ugly bounding chart boxes
+            .configure_view(strokeWidth=0)
         )
