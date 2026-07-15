@@ -170,21 +170,6 @@ class DataCal(JPTrade):
         # Update target metric keys for downstream pipeline steps
         total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols]
 
-        # 5. Apply Empirical Cumulative Distribution Function (ECDF) filters
-        filter_cols = [col for col in total_cols if col != "total_calories"]
-
-        df_local = df_local.with_columns(
-            [
-                (pl.col(col).rank("ordinal") / pl.len()).alias(f"{col}_ecdf")
-                for col in filter_cols
-            ]
-        )
-
-        # Combine all filters into a single call
-        df_local = df_local.filter(
-            [pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols]
-        )
-
         df_local = df_local.group_by(["fiscal_year"]).agg(
             [pl.col(col).sum() for col in total_cols]
         )
