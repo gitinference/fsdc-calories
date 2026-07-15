@@ -69,13 +69,15 @@ class DataCal(JPTrade):
             "iron_mg",
         ]
 
-        # Calculate totals and apply unit conversion simultaneously 
+        # Calculate totals and apply unit conversion simultaneously
         df = df.with_columns(
             [
                 (
                     (pl.col(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
                     if col == "calories"
-                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(
+                        self.get_kg_col_name(col)
+                    )
                 )
                 for col in base_nutri_cols
             ]
@@ -110,6 +112,70 @@ class DataCal(JPTrade):
             )
 
         return df
+
+    def gen_nuti_data_local(self) -> pl.DataFrame:
+        df_local = pl.read_parquet(
+            str(
+                resources.files("fsdc_calories").joinpath(
+                    "data/local_nutri_data.parquet"
+                )
+            )
+        )
+        df_local = df_local.with_columns(
+            hts_code=pl.col("schedule_b").cast(pl.String).str.zfill(4),
+            net_qty=pl.col("cantidad_convertida_mediana"),
+            fiscal_year=pl.col("fiscal_year").cast(pl.Int32),
+        )
+        df_local = df_local.select(pl.col("fiscal_year", "hts_code", "net_qty"))
+
+        nutri_df = pl.read_parquet(
+            str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
+        )
+        nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
+        nutri_df = nutri_df.unique(subset="hts_code", keep="first")
+
+        df_local = df_local.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
+        df_local = df_local.join(nutri_df, on="hts_code", how="inner", validate="m:1")
+
+        base_nutri_cols = [
+            "calories",
+            "fats",
+            "sugars",
+            "protein",
+            "saturated_fat_g",
+            "cholesterol_mg",
+            "sodium_mg",
+            "carbohydrate_g",
+            "fiber_g",
+            "sugar_g",
+            "vitamin_d_iu",
+            "calcium_mg",
+            "potassium_mg",
+            "iron_mg",
+        ]
+
+        # Calculate totals and apply unit conversion simultaneously
+        df_local = df_local.with_columns(
+            [
+                (
+                    (pl.col(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                    if col == "calories"
+                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(
+                        self.get_kg_col_name(col)
+                    )
+                )
+                for col in base_nutri_cols
+            ]
+        )
+
+        # Update target metric keys for downstream pipeline steps
+        total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols]
+
+        df_local = df_local.group_by(["fiscal_year", "hts_code"]).agg(
+            [pl.col(col).sum() for col in total_cols]
+        )
+
+        return df_local
 
     def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
@@ -578,6 +644,215 @@ class DataCal(JPTrade):
             .configure_view(strokeWidth=0)
         )
 
+    def gen_graphs_local_dist(self) -> alt.ConcatChart:
+        # 1. Find the HTS codes that exist in BOTH dataframes (Intersection)
+        # INFO: This should be merged for better logic.
+        df_local = self.gen_nuti_data_local()
+        df_local = df_local.filter(pl.col("fiscal_year") > 2009)
+        df_import = self.gen_nuti_data()
+        df_import = df_import.with_columns(
+            total_calories=pl.when(pl.col("total_calories") < 0)
+            .then(0)
+            .otherwise(pl.col("total_calories"))
+        )
+
+        shared_hts = set(df_import["hts_code"]).intersection(set(df_local["hts_code"]))
+
+        df_import_filtered = df_import.filter(
+            pl.col("hts_code").is_in(shared_hts)
+        ).with_columns(pl.lit("Import").alias("source_type"))
+
+        # A robust renaming map that strips out _g, _mg, _iu before adding _kg
+        rename_mapping = {}
+        for col in df_local.columns:
+            if (
+                col.startswith("total_")
+                and col != "total_calories"
+                and not col.endswith("_kg")
+            ):
+                # Strip old unit suffixes from the base name if they exist
+                clean_name = col
+                for suffix in ["_g", "_mg", "_iu"]:
+                    if clean_name.endswith(suffix):
+                        clean_name = clean_name[: -len(suffix)]
+                        break
+                rename_mapping[col] = f"{clean_name}_kg"
+
+        df_local_filtered = (
+            df_local.filter(pl.col("hts_code").is_in(shared_hts))
+            .rename(
+                rename_mapping
+            )  # Now perfectly aligns "total_saturated_fat_g" -> "total_saturated_fat_kg"
+            .with_columns(pl.lit("Local").alias("source_type"))
+        )
+        # 3. Concatenate the filtered Polars dataframes
+        source_df = pl.concat([df_import_filtered, df_local_filtered])
+
+        # 4. Dynamically find the min and max fiscal years for the slider
+        min_year = int(source_df["fiscal_year"].min())
+        max_year = int(source_df["fiscal_year"].max())
+
+        # 5. Create the slider and selection point for 'fiscal_year'
+        slider = alt.binding_range(
+            min=min_year, max=max_year, step=1, name="Select Year: "
+        )
+        select_year = alt.selection_point(
+            name="fiscal_year", fields=["fiscal_year"], bind=slider, value=max_year
+        )
+
+        # 6. Define a cohesive, professional color palette
+        color_scale = alt.Scale(
+            domain=["Import", "Local"], range=["#1f4e79", "#2d8a81"]
+        )
+
+        # 7. Define the base chart configuration with clean typography and % calculations
+        base = (
+            alt.Chart(source_df)
+            .transform_filter(select_year)
+            .transform_calculate(
+                # Step A: Isolate local calories per row BEFORE any chart-level filtering happens
+                is_local_cal=alt.expr.if_(
+                    alt.datum.source_type == "Local", alt.datum.total_calories, 0
+                )
+            )
+            .transform_joinaggregate(
+                # Step B: Sum the isolated local calories globally per HTS code/year block
+                global_local_calories="sum(is_local_cal)",
+                hts_total="sum(total_calories)",
+                groupby=["hts_code", "fiscal_year"],
+            )
+            .transform_joinaggregate(
+                source_hts_total="sum(total_calories)",
+                groupby=["hts_code", "source_type", "fiscal_year"],
+            )
+            .transform_calculate(
+                # Calculate the percentage contribution per year block
+                pct=alt.datum.source_hts_total
+                / alt.datum.hts_total
+            )
+            .properties(width=280, height=alt.Step(20))
+        )
+
+        # FIXED SORTING LOGIC: Uses the global aggregated 'global_local_calories' field
+        y_sort_axis = alt.Y("hts_code:O").sort(
+            field="global_local_calories", op="max", order="descending"
+        )
+
+        # --- CHART COLUMNS ---
+
+        # Left Chart: Import data
+        left_base = base.transform_filter(alt.datum.source_type == "Import")
+
+        left_bars = left_base.encode(
+            y=y_sort_axis.axis(None),
+            x=alt.X("sum(total_calories):Q")
+            .title("Total Calories")
+            .sort("descending")
+            .axis(format="~s", grid=True, labelExpr="replace(datum.label, 'G', 'B')"),
+            color=alt.Color("source_type:N").scale(color_scale).legend(None),
+        ).mark_bar()
+
+        left_text = left_base.encode(
+            y=y_sort_axis.axis(None),
+            x=alt.X("sum(total_calories):Q").sort("descending"),
+            text=alt.Text("max(pct):Q", format=".1%"),
+        ).mark_text(
+            dx=5,
+            align="right",
+            baseline="middle",
+            font="Arial",
+            fontSize=10,
+            color="#333333",
+        )
+
+        left = alt.layer(left_bars, left_text).properties(
+            title=alt.TitleParams(
+                "Imported Calories",
+                anchor="end",
+                font="Arial",
+                fontSize=13,
+                color="#333333",
+            )
+        )
+
+        # Middle Chart: Centralized HTS Code Text Labels
+        middle = (
+            base.transform_aggregate(
+                global_local_calories="max(global_local_calories)",  # Bind sorting metric to middle channel
+                groupby=["hts_code"],
+            )
+            .encode(
+                y=y_sort_axis.axis(None),
+                text=alt.Text("hts_code:O"),
+            )
+            .mark_text(font="Arial", fontSize=11, color="#555555")
+            .properties(width=60)
+        )
+
+        # Right Chart: Local data
+        right_base = base.transform_filter(alt.datum.source_type == "Local")
+
+        right_bars = right_base.encode(
+            y=y_sort_axis.axis(None),
+            x=alt.X("sum(total_calories):Q")
+            .title("Total Calories")
+            .axis(format="~s", grid=True, labelExpr="replace(datum.label, 'G', 'B')"),
+            color=alt.Color("source_type:N").scale(color_scale).legend(None),
+        ).mark_bar()
+
+        right_text = right_base.encode(
+            y=y_sort_axis.axis(None),
+            x=alt.X("sum(total_calories):Q"),
+            text=alt.Text("max(pct):Q", format=".1%"),
+        ).mark_text(
+            dx=5,
+            align="left",
+            baseline="middle",
+            font="Arial",
+            fontSize=10,
+            color="#333333",
+        )
+
+        right = alt.layer(right_bars, right_text).properties(
+            title=alt.TitleParams(
+                "Local Calories",
+                anchor="start",
+                font="Arial",
+                fontSize=13,
+                color="#333333",
+            )
+        )
+
+        chart = (
+            alt.concat(left, middle, right, spacing=10)
+            .add_params(
+                select_year
+            )  # MOVED HERE: Parameter binds cleanly to the composite chart level
+            .properties(
+                title=alt.TitleParams(
+                    text="Caloric Distribution Comparison",
+                    subtitle=[
+                        "Comparing localized and imported total calories across shared HTS codes.",
+                        " ",
+                    ],
+                    fontSize=16,
+                    anchor="middle",
+                    font="Arial",
+                    subtitleColor="#666666",
+                )
+            )
+            .configure_view(stroke=None)
+            .configure_axis(
+                domain=False,
+                ticks=False,
+                labelFont="Arial",
+                titleFont="Arial",
+                titleColor="#444444",
+            )
+        )
+
+        return chart
+
     def standardize_to_kg(self, col_name: str) -> pl.Expr:
         """
         Helper method to standardize raw nutritional inputs to kilograms (kg).
@@ -603,11 +878,11 @@ class DataCal(JPTrade):
         """
         if col_name == "calories":
             return "total_calories"
-        
+
         # Strip existing unit suffixes if present
         for suffix in ["_g", "_mg", "_iu"]:
             if col_name.endswith(suffix):
                 return f"total_{col_name[:-len(suffix)]}_kg"
-        
+
         # Otherwise append _kg directly (for fats, sugars, protein)
         return f"total_{col_name}_kg"
