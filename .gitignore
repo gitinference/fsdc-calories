@@ -41,6 +41,8 @@ MANIFEST
 # Exeption for requirements
 !requirements.txt
 !nutri_matrix.parquet
+!local_nutri_data.parquet
+!schedule_b_reference.parquet
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
