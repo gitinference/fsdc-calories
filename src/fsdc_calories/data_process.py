@@ -26,9 +26,9 @@ class DataCal(JPTrade):
     def __init__(
         self,
         saving_dir: str = "data/",
-        database_file: str = "data.ddb",
+        log_file: str = "data.log",
     ):
-        super().__init__(saving_dir, database_file)
+        super().__init__(saving_dir, log_file)
 
     def gen_nuti_data(self, time_frame: str = "fiscal") -> pl.DataFrame:
         """
