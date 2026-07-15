@@ -69,13 +69,15 @@ class DataCal(JPTrade):
             "iron_mg",
         ]
 
-        # Calculate totals and apply unit conversion simultaneously 
+        # Calculate totals and apply unit conversion simultaneously
         df = df.with_columns(
             [
                 (
                     (pl.col(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
                     if col == "calories"
-                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(
+                        self.get_kg_col_name(col)
+                    )
                 )
                 for col in base_nutri_cols
             ]
@@ -110,6 +112,84 @@ class DataCal(JPTrade):
             )
 
         return df
+
+    def gen_nuti_data_local(self) -> pl.DataFrame:
+        df_local = pl.read_parquet(
+            str(
+                resources.files("fsdc_calories").joinpath(
+                    "data/local_nutri_data.parquet"
+                )
+            )
+        )
+        df_local = df_local.with_columns(
+            hts_code=pl.col("schedule_b").cast(pl.String).str.zfill(4),
+            net_qty=pl.col("cantidad_convertida_mediana"),
+        )
+        df_local = df_local.select(pl.col("fiscal_year", "hts_code", "net_qty"))
+
+        nutri_df = pl.read_parquet(
+            str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
+        )
+        nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
+        nutri_df = nutri_df.unique(subset="hts_code", keep="first")
+
+        df_local = df_local.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
+        df_local = df_local.join(nutri_df, on="hts_code", how="inner", validate="m:1")
+
+        base_nutri_cols = [
+            "calories",
+            "fats",
+            "sugars",
+            "protein",
+            "saturated_fat_g",
+            "cholesterol_mg",
+            "sodium_mg",
+            "carbohydrate_g",
+            "fiber_g",
+            "sugar_g",
+            "vitamin_d_iu",
+            "calcium_mg",
+            "potassium_mg",
+            "iron_mg",
+        ]
+
+        # Calculate totals and apply unit conversion simultaneously
+        df_local = df_local.with_columns(
+            [
+                (
+                    (pl.col(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                    if col == "calories"
+                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(
+                        self.get_kg_col_name(col)
+                    )
+                )
+                for col in base_nutri_cols
+            ]
+        )
+
+        # Update target metric keys for downstream pipeline steps
+        total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols]
+
+        # 5. Apply Empirical Cumulative Distribution Function (ECDF) filters
+        filter_cols = [col for col in total_cols if col != "total_calories"]
+
+        df_local = df_local.with_columns(
+            [
+                (pl.col(col).rank("ordinal") / pl.len()).alias(f"{col}_ecdf")
+                for col in filter_cols
+            ]
+        )
+
+        # Combine all filters into a single call
+        df_local = df_local.filter(
+            [pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols]
+        )
+
+        df_local = df_local.group_by(["fiscal_year"]).agg(
+            [pl.col(col).sum() for col in total_cols]
+        )
+
+        return df_local
 
     def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
@@ -603,11 +683,11 @@ class DataCal(JPTrade):
         """
         if col_name == "calories":
             return "total_calories"
-        
+
         # Strip existing unit suffixes if present
         for suffix in ["_g", "_mg", "_iu"]:
             if col_name.endswith(suffix):
                 return f"total_{col_name[:-len(suffix)]}_kg"
-        
+
         # Otherwise append _kg directly (for fats, sugars, protein)
         return f"total_{col_name}_kg"
