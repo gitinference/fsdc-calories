@@ -644,10 +644,17 @@ class DataCal(JPTrade):
             .configure_view(strokeWidth=0)
         )
 
-    def gen_graphs_local_dist(self) -> None:
+    def gen_graphs_local_dist(self) -> alt.ConcatChart:
         # 1. Find the HTS codes that exist in BOTH dataframes (Intersection)
+        # INFO: This should be merged for better logic.
         df_local = self.gen_nuti_data_local()
+        df_local = df_local.filter(pl.col("fiscal_year") > 2009)
         df_import = self.gen_nuti_data()
+        df_import = df_import.with_columns(
+            total_calories=pl.when(pl.col("total_calories") < 0)
+            .then(0)
+            .otherwise(pl.col("total_calories"))
+        )
 
         shared_hts = set(df_import["hts_code"]).intersection(set(df_local["hts_code"]))
 
@@ -701,7 +708,6 @@ class DataCal(JPTrade):
         # 7. Define the base chart configuration with clean typography and % calculations
         base = (
             alt.Chart(source_df)
-            .add_params(select_year)
             .transform_filter(select_year)
             .transform_calculate(
                 # Step A: Isolate local calories per row BEFORE any chart-level filtering happens
@@ -728,7 +734,6 @@ class DataCal(JPTrade):
         )
 
         # FIXED SORTING LOGIC: Uses the global aggregated 'global_local_calories' field
-        # Sorting order 'descending' places the highest local calorie categories at the top.
         y_sort_axis = alt.Y("hts_code:O").sort(
             field="global_local_calories", op="max", order="descending"
         )
@@ -818,9 +823,11 @@ class DataCal(JPTrade):
             )
         )
 
-        # 8. Concatenate and apply top-level chart configurationsf
         chart = (
             alt.concat(left, middle, right, spacing=10)
+            .add_params(
+                select_year
+            )  # MOVED HERE: Parameter binds cleanly to the composite chart level
             .properties(
                 title=alt.TitleParams(
                     text="Caloric Distribution Comparison",
