@@ -1,3 +1,9 @@
+## [0.10.0] - 2026-07-15
+
+### 🐛 Bug Fixes
+
+- *(data_process.py)* Remove ECDF filtering as it is not necessary and can be computationally expensive
+- *(scratch.ipynb)* Refactor code to improve readability and maintainability by using more descriptive variable names and comments
 ## [0.9.1] - 2026-07-15
 
 ### 🚜 Refactor
