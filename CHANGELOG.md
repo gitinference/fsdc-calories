@@ -1,3 +1,8 @@
+## [0.9.1] - 2026-07-15
+
+### 🚜 Refactor
+
+- *(data_process.py)* Standardize nutritional inputs to kilograms and rename columns accordingly
 ## [0.8.0] - 2026-06-25
 
 ### 🚀 Features
