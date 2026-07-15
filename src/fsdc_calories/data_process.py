@@ -33,6 +33,7 @@ class DataCal(JPTrade):
     def gen_nuti_data(self, time_frame: str = "fiscal") -> pl.DataFrame:
         """
         Generate nutrition data dynamically aggregated across different timeframes.
+        All mass metrics are standardized and renamed to end with '_kg'.
         """
         # 1. Load nutrition matrix
         nutri_df = pl.read_parquet(
@@ -48,7 +49,7 @@ class DataCal(JPTrade):
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
         df = df.join(nutri_df, on="hts_code", how="inner", validate="m:1")
 
-        # 4. Compute metrics using a list comprehension to avoid repetitive code
+        # 4. Compute metrics
         df = df.with_columns(net_qty=pl.col("imports_qty") - pl.col("exports_qty"))
 
         base_nutri_cols = [
@@ -68,17 +69,23 @@ class DataCal(JPTrade):
             "iron_mg",
         ]
 
-        # Calculate totals for all nutritional columns simultaneously
+        # Calculate totals and apply unit conversion simultaneously 
         df = df.with_columns(
             [
-                (pl.col(col) * pl.col("net_qty")).alias(f"total_{col}")
+                (
+                    (pl.col(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                    if col == "calories"
+                    else (self.standardize_to_kg(col) * pl.col("net_qty")).alias(self.get_kg_col_name(col))
+                )
                 for col in base_nutri_cols
             ]
         )
 
+        # Update target metric keys for downstream pipeline steps
+        total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols]
+
         # 5. Apply Empirical Cumulative Distribution Function (ECDF) filters
-        # (Excluding total_calories as per your original logic)
-        filter_cols = [f"total_{col}" for col in base_nutri_cols if col != "calories"]
+        filter_cols = [col for col in total_cols if col != "total_calories"]
 
         df = df.with_columns(
             [
@@ -87,7 +94,7 @@ class DataCal(JPTrade):
             ]
         )
 
-        # Combine all filters into a single call (Polars evaluates commas as AND)
+        # Combine all filters into a single call
         df = df.filter([pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols])
 
         # 6. Dynamically resolve group-by columns based on time_frame
@@ -95,7 +102,6 @@ class DataCal(JPTrade):
         group_keys = time_cols + ["hts_code"]
 
         # 7. Final aggregation
-        total_cols = [f"total_{col}" for col in base_nutri_cols]
         df = df.group_by(group_keys).agg([pl.col(col).sum() for col in total_cols])
 
         if time_frame == "monthly":
@@ -201,20 +207,20 @@ class DataCal(JPTrade):
     def gen_graphs_nuti_data(self) -> alt.Chart:
         """Generates an interactive line chart tracking nutritional metrics over time."""
         column_label_map = {
-            "total_calories": "Calories",
-            "total_fats": "Fats",
-            "total_sugars": "Sugars",
-            "total_protein": "Proteins",
-            "total_saturated_fat_g": "Saturated Fats (g)",
-            "total_cholesterol_mg": "Cholesterol (mg)",
-            "total_sodium_mg": "Sodium (mg)",
-            "total_carbohydrate_g": "Carbohydrates (g)",
-            "total_fiber_g": "Fibers (g)",
-            "total_sugar_g": "Sugars (g)",
-            "total_vitamin_d_iu": "Vitamin D (IU)",
-            "total_calcium_mg": "Calcium (mg)",
-            "total_potassium_mg": "Potassium (mg)",
-            "total_iron_mg": "Iron (mg)",
+            "total_calories": "Calories (kcal)",
+            "total_fats_kg": "Fats (kg)",
+            "total_sugars_kg": "Sugars (kg)",
+            "total_protein_kg": "Proteins (kg)",
+            "total_saturated_fat_kg": "Saturated Fats (kg)",
+            "total_cholesterol_kg": "Cholesterol (kg)",
+            "total_sodium_kg": "Sodium (kg)",
+            "total_carbohydrate_kg": "Carbohydrates (kg)",
+            "total_fiber_kg": "Fibers (kg)",
+            "total_sugar_kg": "Sugars (kg)",
+            "total_vitamin_d_kg": "Vitamin D (kg)",
+            "total_calcium_kg": "Calcium (kg)",
+            "total_potassium_kg": "Potassium (kg)",
+            "total_iron_kg": "Iron (kg)",
         }
 
         # 1. Pre-aggregate data using Polars
@@ -236,7 +242,7 @@ class DataCal(JPTrade):
             name="Nutrient: ",
         )
         ycol_param = alt.param(
-            name="selected_metric", value="total_iron_mg", bind=dropdown
+            name="selected_metric", value="total_iron_kg", bind=dropdown
         )
 
         # 3. Selection parameter for interactive hover tooltips
@@ -260,7 +266,7 @@ class DataCal(JPTrade):
                 "selected_value:Q",
                 title=None,
                 axis=alt.Axis(
-                    format="~s",  # <--- Formats numbers like 1M, 2B, 500k
+                    format="~s",
                     gridDash=[2, 2],
                     gridColor="#E0E0E0",
                 ),
@@ -277,7 +283,7 @@ class DataCal(JPTrade):
                 alt.Tooltip(
                     "selected_value:Q",
                     title="Value",
-                    format="~s",  # <--- Formats tooltip values to M/B/k
+                    format="~s",
                 ),
             ],
         )
@@ -571,3 +577,37 @@ class DataCal(JPTrade):
             )
             .configure_view(strokeWidth=0)
         )
+
+    def standardize_to_kg(self, col_name: str) -> pl.Expr:
+        """
+        Helper method to standardize raw nutritional inputs to kilograms (kg).
+        """
+        if col_name.endswith("_g") or col_name in ["fats", "sugars", "protein"]:
+            # Grams to kg
+            return pl.col(col_name) / 1_000
+        elif col_name.endswith("_mg"):
+            # Milligrams to kg
+            return pl.col(col_name) / 1_000_000
+        elif col_name.endswith("_iu"):
+            # Vitamin D IU to kg: 1 IU = 0.025 mcg = 2.5e-11 kg
+            return pl.col(col_name) * 2.5e-11
+        else:
+            # Fallback for unmatched columns (like calories)
+            return pl.col(col_name)
+
+    def get_kg_col_name(self, col_name: str) -> str:
+        """
+        Helper method to generate the target column name ending in '_kg'.
+        Example: 'saturated_fat_g' -> 'total_saturated_fat_kg'
+                 'fats'            -> 'total_fats_kg'
+        """
+        if col_name == "calories":
+            return "total_calories"
+        
+        # Strip existing unit suffixes if present
+        for suffix in ["_g", "_mg", "_iu"]:
+            if col_name.endswith(suffix):
+                return f"total_{col_name[:-len(suffix)]}_kg"
+        
+        # Otherwise append _kg directly (for fats, sugars, protein)
+        return f"total_{col_name}_kg"
