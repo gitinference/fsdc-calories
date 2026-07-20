@@ -178,7 +178,7 @@ class DataCal(JPTrade):
         return df_local
 
     def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
+        df: pd.DataFrame = self.process_price(agriculture_filter=False).to_pandas()
 
         import_pct_col = "pct_change_imports_year_over_year"
         export_pct_col = "pct_change_exports_year_over_year"
