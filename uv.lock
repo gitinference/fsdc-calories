@@ -652,11 +652,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.29.7"
+version = "3.31.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/35/94/00f2059e4835eace3ae8fde680b932c496f8ec7bdc99168dfa53fb2e6b79/filelock-3.29.7.tar.gz", hash = "sha256:5b481979797ae69e72f0b389d89a80bdd585c260c5b3f1fb9c0a5ba9bb3f195d", size = 71521, upload-time = "2026-07-08T05:46:58.716Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/55/1e19b2b56a24a4b94624f7e819e1bb87fa6c5609dbaf621df3aa6568a761/filelock-3.31.1.tar.gz", hash = "sha256:9e0c4e88ebe90833c1beafd3a547ccbc0bf7f491cd3858c3ec7aed63efe02163", size = 196656, upload-time = "2026-07-20T03:14:32.414Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/02/be4a57b60c7149b55b9e3b3c13f609cd8eb5307c751f22bd8fb8d262e75b/filelock-3.29.7-py3-none-any.whl", hash = "sha256:987db6f789a3a2a59f55081801b2b3697cb97e2a736b5f1a9e99b559285fbc51", size = 46036, upload-time = "2026-07-08T05:46:57.53Z" },
+    { url = "https://files.pythonhosted.org/packages/88/61/df1d9db18f188d0ae648956a1decadc0e3b77d0571474370fd01f28a82b1/filelock-3.31.1-py3-none-any.whl", hash = "sha256:9ea33146c780161bf67cb20c7cb26b651566820d65ad8dfdd79422602a2dcfc0", size = 97189, upload-time = "2026-07-20T03:14:31.307Z" },
 ]
 
 [[package]]
@@ -947,7 +947,7 @@ wheels = [
 
 [[package]]
 name = "jp-imports"
-version = "1.6.0"
+version = "1.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "censusforge" },
@@ -958,14 +958,14 @@ dependencies = [
     { name = "polars" },
     { name = "pyarrow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/42/4945cb5d38bd9755958b8dc7e55cd7ca571edf046d140d4b617ae3266ebd/jp_imports-1.6.0.tar.gz", hash = "sha256:b156d0c1c965ba5948faac6576d96d697c3ea41769b8b2c708da724e8a808ec7", size = 179075, upload-time = "2026-07-10T17:15:47.092Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/9f/59e9a448c739f4cc2d9040a95cf3ac9dbaf692ac489ea799fa03f8640d25/jp_imports-1.6.2.tar.gz", hash = "sha256:ae44045437e784be96abe1a05c906542b3e579781f0aebe5bea5be02d96db5e3", size = 178253, upload-time = "2026-07-20T19:06:04.888Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/71/97ffe5efc5a5b121a29c26b62fa6fb35136b87467aaaf1ef8920f0469917/jp_imports-1.6.0-py3-none-any.whl", hash = "sha256:2f8abf164ac13c5c78add847d135b80f0061b648a9f1f705eaaf62a48fc0ebc5", size = 23121, upload-time = "2026-07-10T17:15:45.831Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/09/d3c90dc6717de52055ac9c4e4e474114e9605bcd797aa2885981989292d1/jp_imports-1.6.2-py3-none-any.whl", hash = "sha256:b0c66c00cf8002e80974bad5e8dd046b946dbbb269b1e2fc5265a4de15d0166b", size = 23307, upload-time = "2026-07-20T19:06:03.625Z" },
 ]
 
 [[package]]
 name = "jp-tools"
-version = "1.0.1"
+version = "1.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -973,9 +973,9 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/60/01f3733d23ef840fbd6056cdbde80131566a8bf99aa72cb2105c632507c1/jp_tools-1.0.1.tar.gz", hash = "sha256:0bc997dd6c9cd57b5702fde11b90c143e8451f2c42904ae81566566e3ed4f85e", size = 221913, upload-time = "2026-07-09T18:43:25.669Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/b8/d0040c4f870925a8fa4d69c97c1ec87dfb1c1f2918043dd594d0bcb3354f/jp_tools-1.0.4.tar.gz", hash = "sha256:43e8c4f9c02801aafe37be7d4c4e20d359e84445fd887c3d817fc287f285e8dd", size = 221704, upload-time = "2026-07-20T17:49:41.999Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/80/d3382fdb9b10350fccbc9b080e5ea2ecb8259499db13b881027f2ae7f07c/jp_tools-1.0.1-py3-none-any.whl", hash = "sha256:effc76d5343e4895ab514eafe63701be0fe6eeb5ab9bd42692cc63752322966b", size = 15668, upload-time = "2026-07-09T18:43:26.71Z" },
+    { url = "https://files.pythonhosted.org/packages/15/b3/3852cae5b8ae38a2703d26c7bad4723df09bdef871c6112dd1e16a17f305/jp_tools-1.0.4-py3-none-any.whl", hash = "sha256:8a58097db861b7467ef783bfb122a71124e07dd7dd164299cfb4d86cb03a0dba", size = 15676, upload-time = "2026-07-20T17:49:42.982Z" },
 ]
 
 [[package]]
@@ -1055,15 +1055,15 @@ wheels = [
 
 [[package]]
 name = "jupyter-builder"
-version = "1.1.0"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jupyter-core" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/df/db5efc4e28803a1421350445e53d85ec571a4e6928e3524ccc39f4e16584/jupyter_builder-1.1.0.tar.gz", hash = "sha256:b996e8af616900f18724fa34883169d869be2205497940bec78a3a1031eb897d", size = 971142, upload-time = "2026-07-11T07:24:02.4Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/61/47f7ae054f5cd3983c10e1d65a6eb7fcd4b87ebb1056e190ef7d63ff4f19/jupyter_builder-1.1.1.tar.gz", hash = "sha256:1a13977912b08deda77fce2c803940131c27cf77a27ed64b9ffca25aa0ed7e6c", size = 971667, upload-time = "2026-07-17T13:14:47.761Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/fb/53adbc72931b4429275b160044c3e1bcbc8fbb5ea6b8f318a357834842fb/jupyter_builder-1.1.0-py3-none-any.whl", hash = "sha256:d9d5280e8845f726663545c3a6db55bd205127616eeb8958481091d6cba71b6a", size = 912964, upload-time = "2026-07-11T07:24:00.279Z" },
+    { url = "https://files.pythonhosted.org/packages/83/cc/f6a12de1c890ea5dd2816c5c76d5ac6d3ed52db3c37f78691328207d13b9/jupyter_builder-1.1.1-py3-none-any.whl", hash = "sha256:f9c14bc55c0488a073f62af12d468936fcf9ecb7e9dd802f6f9c33de46ad70db", size = 913264, upload-time = "2026-07-17T13:14:45.857Z" },
 ]
 
 [[package]]
@@ -1857,11 +1857,11 @@ wheels = [
 
 [[package]]
 name = "platformdirs"
-version = "4.10.0"
+version = "4.10.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d7/47/e4501f49c178ae1d9f4a75073fda4204f52647993f075a9db4d14930e0c5/platformdirs-4.10.0.tar.gz", hash = "sha256:31e761a6a0ca04faf7353ea759bdba55652be214725111e5aac52dfa29d4bef7", size = 31224, upload-time = "2026-05-28T03:32:53.587Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/cd/4f25b2f95b23f5d2c9c1fe43e49841bff5800562149b2666afc09309aa8f/platformdirs-4.10.1.tar.gz", hash = "sha256:ceab4084426fe6319ce18e86deada8ab1b7487c7aee7040c55e277c9ae793695", size = 31678, upload-time = "2026-07-18T03:53:43.808Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/e6/cd9575ac904136b3cbf7aa7ee819ef86eedb7274e46f230e94ea4342e729/platformdirs-4.10.0-py3-none-any.whl", hash = "sha256:fb516cdb12eb0d857d0cd85a7c57cea4d060bee4578d6cf5a14dfdf8cbf8784a", size = 22743, upload-time = "2026-05-28T03:32:52.175Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/73/6fd0bb9ce84138c3857f12e9de63bc901852975a092d545f18087a204aa2/platformdirs-4.10.1-py3-none-any.whl", hash = "sha256:0e4eff26be2d75293977f7cddc153fd9b8eaa7fb0c7b64ffe4076cb443117443", size = 22906, upload-time = "2026-07-18T03:53:42.576Z" },
 ]
 
 [[package]]
@@ -2478,11 +2478,11 @@ wheels = [
 
 [[package]]
 name = "soupsieve"
-version = "2.8.4"
+version = "2.9"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/47/2c/0a5f6f8ee0d5589e48c7640213ed5175d52cf540a06725b628cc1a45d6ce/soupsieve-2.8.4.tar.gz", hash = "sha256:e121fd02e975c695e4e9e8774a5ee35d74714b59307868dcc5319ad2d9e3328e", size = 121110, upload-time = "2026-05-24T13:55:57.154Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/f1/93422647dd7e461f23d254e6b2bfa687a85b53aeb4903fcdbb74474d4584/soupsieve-2.9.tar.gz", hash = "sha256:acee8417325c5653e1377dc31eccad59eb82cbc65942afe6174c53b3aaad63fc", size = 122122, upload-time = "2026-07-19T01:35:18.425Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/f5/0c41cb68dcae6b7de4fac4188a3a9589e21fb31df21ea3a2e888db95e6c9/soupsieve-2.8.4-py3-none-any.whl", hash = "sha256:e7e6b0769c8f51ed59acab6e994b00621096cfb1c640a7509295987388fbaf65", size = 37304, upload-time = "2026-05-24T13:55:55.406Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/d6/3185ab5ad1280319b31986898f3206dd7227cd75e293d4dba2a5e6bf27a0/soupsieve-2.9-py3-none-any.whl", hash = "sha256:a2b2c76d67df2382d245409fd71e321a571717e58463efa32ace87dcadac2c12", size = 37387, upload-time = "2026-07-19T01:35:17.106Z" },
 ]
 
 [[package]]
