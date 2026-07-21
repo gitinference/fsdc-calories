@@ -1,3 +1,8 @@
+## [0.11.0] - 2026-07-21
+
+### 🐛 Bug Fixes
+
+- *(data_process.py)* Fix net_qty calculation and add tooltips for better user experience
 ## [0.10.2] - 2026-07-20
 
 ### 🐛 Bug Fixes
