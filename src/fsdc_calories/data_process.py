@@ -44,13 +44,15 @@ class DataCal(JPTrade):
 
         # 2. Pull trade data using the dynamic timeframe
         df = self.process_int_jp(time_frame=time_frame, level="hts")
+        df = df.with_columns(
+            net_qty=pl.when(pl.col("net_qty") < 0)
+            .then(pl.lit(0))
+            .otherwise(pl.col("net_qty"))
+        )
 
         # 3. Match HTS lengths (slicing down to 4 digits to match nutri matrix)
         df = df.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
         df = df.join(nutri_df, on="hts_code", how="inner", validate="m:1")
-
-        # 4. Compute metrics
-        df = df.with_columns(net_qty=pl.col("imports_qty") - pl.col("exports_qty"))
 
         base_nutri_cols = [
             "calories",
@@ -127,6 +129,12 @@ class DataCal(JPTrade):
             fiscal_year=pl.col("fiscal_year").cast(pl.Int32),
         )
         df_local = df_local.select(pl.col("fiscal_year", "hts_code", "net_qty"))
+
+        df_local = df_local.with_columns(
+            net_qty=pl.when(pl.col("net_qty") < 0)
+            .then(pl.lit(0))
+            .otherwise(pl.col("net_qty"))
+        )
 
         nutri_df = pl.read_parquet(
             str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
@@ -314,6 +322,12 @@ class DataCal(JPTrade):
         # 3. Selection parameter for interactive hover tooltips
         hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
 
+        # Define standard tooltips for reusable encoding
+        tooltip_config = [
+            alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
+            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
+        ]
+
         # 4. Base chart with calculated field
         base = (
             alt.Chart(data)
@@ -344,19 +358,17 @@ class DataCal(JPTrade):
             x="datetime:T",
             y="selected_value:Q",
             opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
-            tooltip=[
-                alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
-                alt.Tooltip(
-                    "selected_value:Q",
-                    title="Value",
-                    format="~s",
-                ),
-            ],
+            tooltip=tooltip_config,
         )
 
-        # Invisible rule selector for better hover snapping
+        # Transparent rule selector for seamless hover snapping across the x-axis
         selectors = (
-            base.mark_rule(opacity=0).encode(x="datetime:T").add_params(hover_select)
+            base.mark_rule(strokeWidth=20, opacity=0)
+            .encode(
+                x="datetime:T",
+                tooltip=tooltip_config,  # Direct tooltip attached to hover area
+            )
+            .add_params(hover_select)
         )
 
         # 7. Combine layers & apply production styling
