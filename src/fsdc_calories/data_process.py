@@ -297,12 +297,123 @@ class DataCal(JPTrade):
             "total_iron_kg": "Iron (kg)",
         }
 
-        # 1. Pre-aggregate data using Polars
         data = (
             self.gen_nuti_data(time_frame="monthly")
             .group_by("datetime")
             .agg([pl.col(c).sum() for c in column_label_map.keys()])
             .sort("datetime")
+            .to_pandas()
+        )
+
+        if data.empty:
+            return alt.Chart(data).mark_text(text="No data available")
+
+        # 2. Dropdown binding parameter
+        dropdown = alt.binding_select(
+            options=list(column_label_map.keys()),
+            labels=list(column_label_map.values()),
+            name="Nutrient: ",
+        )
+        ycol_param = alt.param(
+            name="selected_metric", value="total_iron_kg", bind=dropdown
+        )
+
+        # 3. Selection parameter for interactive hover tooltips
+        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
+
+        # Define standard tooltips for reusable encoding
+        tooltip_config = [
+            alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
+            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
+        ]
+
+        # 4. Base chart with calculated field
+        base = (
+            alt.Chart(data)
+            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
+            .add_params(ycol_param)
+        )
+
+        # 5. Primary line chart
+        line = base.mark_line(
+            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
+        ).encode(
+            x=alt.X(
+                "datetime:T", title="Date", axis=alt.Axis(format="%b %Y", grid=False)
+            ),
+            y=alt.Y(
+                "selected_value:Q",
+                title=None,
+                axis=alt.Axis(
+                    format="~s",
+                    gridDash=[2, 2],
+                    gridColor="#E0E0E0",
+                ),
+            ),
+        )
+
+        # 6. Interactive hover points & tooltips
+        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
+            x="datetime:T",
+            y="selected_value:Q",
+            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
+            tooltip=tooltip_config,
+        )
+
+        # Transparent rule selector for seamless hover snapping across the x-axis
+        selectors = (
+            base.mark_rule(strokeWidth=20, opacity=0)
+            .encode(
+                x="datetime:T",
+                tooltip=tooltip_config,  # Direct tooltip attached to hover area
+            )
+            .add_params(hover_select)
+        )
+
+        # 7. Combine layers & apply production styling
+        final_chart = (
+            alt.layer(line, points, selectors)
+            .properties(
+                width="container",
+                height=380,
+                title=alt.TitleParams(
+                    text="Nutritional Intake Over Time",
+                    subtitle="Select a nutrient from the dropdown menu below to update the view.",
+                    fontSize=16,
+                    subtitleFontSize=12,
+                    anchor="start",
+                ),
+            )
+            .configure_view(strokeWidth=0)
+            .configure_axis(labelFontSize=11, titleFontSize=12)
+        )
+
+        return final_chart
+
+    def gen_graphs_nuti_data_fiscal(self, local: bool = False) -> alt.Chart:
+        """Generates an interactive line chart tracking nutritional metrics over time."""
+        column_label_map = {
+            "total_calories": "Calories (kcal)",
+            "total_fats_kg": "Fats (kg)",
+            "total_sugars_kg": "Sugars (kg)",
+            "total_protein_kg": "Proteins (kg)",
+            "total_saturated_fat_kg": "Saturated Fats (kg)",
+            "total_cholesterol_kg": "Cholesterol (kg)",
+            "total_sodium_kg": "Sodium (kg)",
+            "total_carbohydrate_kg": "Carbohydrates (kg)",
+            "total_fiber_kg": "Fibers (kg)",
+            "total_sugar_kg": "Sugars (kg)",
+            "total_vitamin_d_kg": "Vitamin D (kg)",
+            "total_calcium_kg": "Calcium (kg)",
+            "total_potassium_kg": "Potassium (kg)",
+            "total_iron_kg": "Iron (kg)",
+        }
+
+        data = (
+            self.gen_nuti_data(time_frame="fiscal")
+            .group_by("fiscal_year")
+            .agg([pl.col(c).sum() for c in column_label_map.keys()])
+            .sort("fiscal_year")
             .to_pandas()
         )
 
