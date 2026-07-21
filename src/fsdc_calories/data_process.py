@@ -1,12 +1,13 @@
 import importlib.resources as resources
 import logging
+from datetime import date, timedelta
 from pathlib import Path
+from typing import Literal
 
 import altair as alt
-from datetime import date, timedelta
 import numpy as np
-import polars as pl
 import pandas as pd
+import polars as pl
 from jp_imports import JPTrade
 
 from .utils.constants import Constants
@@ -390,8 +391,14 @@ class DataCal(JPTrade):
 
         return final_chart
 
-    def gen_graphs_nuti_data_fiscal(self, local: bool = False) -> alt.Chart:
-        """Generates an interactive line chart tracking nutritional metrics over time."""
+    def gen_graphs_nuti_data_fiscal(
+        self, source: Literal["imported", "local", "both"] = "both"
+    ) -> alt.Chart:
+        """Generates an interactive line chart tracking nutritional metrics over fiscal years.
+
+        :param source: Data source to display - 'imported', 'local', or 'both'
+            (sum of imported + local).
+        """
         column_label_map = {
             "total_calories": "Calories (kcal)",
             "total_fats_kg": "Fats (kg)",
@@ -409,9 +416,24 @@ class DataCal(JPTrade):
             "total_iron_kg": "Iron (kg)",
         }
 
+        # Fetch data based on selected source option
+        if source == "imported":
+            data = self.gen_nuti_data(time_frame="fiscal")
+        elif source == "local":
+            data = self.gen_nuti_data_local()
+        elif source == "both":
+            df_imports = self.gen_nuti_data(time_frame="fiscal")
+            df_local = self.gen_nuti_data_local()
+            data = df_imports.vstack(df_local)
+            data = data.filter(pl.col("fiscal_year") > 2009)
+        else:
+            raise ValueError(
+                f"Invalid source '{source}'. Expected 'imported', 'local', or 'both'."
+            )
+
+        # Process and aggregate Polars DataFrame
         data = (
-            self.gen_nuti_data(time_frame="fiscal")
-            .group_by("fiscal_year")
+            data.group_by("fiscal_year")
             .agg([pl.col(c).sum() for c in column_label_map.keys()])
             .sort("fiscal_year")
             .to_pandas()
@@ -420,7 +442,7 @@ class DataCal(JPTrade):
         if data.empty:
             return alt.Chart(data).mark_text(text="No data available")
 
-        # 2. Dropdown binding parameter
+        # Dropdown binding parameter for nutrients
         dropdown = alt.binding_select(
             options=list(column_label_map.keys()),
             labels=list(column_label_map.values()),
@@ -430,67 +452,77 @@ class DataCal(JPTrade):
             name="selected_metric", value="total_iron_kg", bind=dropdown
         )
 
-        # 3. Selection parameter for interactive hover tooltips
+        # Selection parameter for interactive hover tooltips
         hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
 
-        # Define standard tooltips for reusable encoding
+        # Tooltips formatted for integer year and metric values
         tooltip_config = [
-            alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
+            alt.Tooltip("fiscal_year:Q", title="Fiscal Year", format="d"),
             alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
         ]
 
-        # 4. Base chart with calculated field
+        # Base chart with calculated field
         base = (
             alt.Chart(data)
             .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
             .add_params(ycol_param)
         )
 
-        # 5. Primary line chart
+        # Primary line chart
         line = base.mark_line(
             color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
         ).encode(
             x=alt.X(
-                "datetime:T", title="Date", axis=alt.Axis(format="%b %Y", grid=False)
+                "fiscal_year:Q",
+                title="Fiscal Year",
+                axis=alt.Axis(grid=False, format="d", tickMinStep=1),
             ),
             y=alt.Y(
                 "selected_value:Q",
                 title=None,
                 axis=alt.Axis(
-                    format="~s",
                     gridDash=[2, 2],
                     gridColor="#E0E0E0",
+                    labelExpr="replace(datum.label, 'G', 'B')",
+                    format="~s",
                 ),
             ),
         )
 
-        # 6. Interactive hover points & tooltips
+        # Interactive hover points & tooltips
         points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
-            x="datetime:T",
+            x="fiscal_year:Q",
             y="selected_value:Q",
             opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
             tooltip=tooltip_config,
         )
 
-        # Transparent rule selector for seamless hover snapping across the x-axis
+        # Transparent rule selector for hover snapping
         selectors = (
             base.mark_rule(strokeWidth=20, opacity=0)
             .encode(
-                x="datetime:T",
-                tooltip=tooltip_config,  # Direct tooltip attached to hover area
+                x="fiscal_year:Q",
+                tooltip=tooltip_config,
             )
             .add_params(hover_select)
         )
 
-        # 7. Combine layers & apply production styling
+        # Dynamic subtitle based on selection
+        subtitle_map = {
+            "imported": "Showing imported nutritional intake.",
+            "local": "Showing local nutritional intake.",
+            "both": "Showing combined imported + local nutritional intake.",
+        }
+
+        # Combine layers & apply styling
         final_chart = (
             alt.layer(line, points, selectors)
             .properties(
                 width="container",
                 height=380,
                 title=alt.TitleParams(
-                    text="Nutritional Intake Over Time",
-                    subtitle="Select a nutrient from the dropdown menu below to update the view.",
+                    text="Nutritional Intake by Fiscal Year",
+                    subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
                     fontSize=16,
                     subtitleFontSize=12,
                     anchor="start",
