@@ -280,22 +280,22 @@ class DataCal(JPTrade):
         return df_long
 
     def gen_graphs_nuti_data(self) -> alt.Chart:
-        """Generates an interactive line chart tracking nutritional metrics over time."""
+        """Generates an interactive line chart tracking imported nutritional metrics over time."""
         column_label_map = {
-            "total_calories": "Calories (kcal)",
-            "total_fats_kg": "Fats (kg)",
-            "total_sugars_kg": "Sugars (kg)",
-            "total_protein_kg": "Proteins (kg)",
-            "total_saturated_fat_kg": "Saturated Fats (kg)",
-            "total_cholesterol_kg": "Cholesterol (kg)",
-            "total_sodium_kg": "Sodium (kg)",
-            "total_carbohydrate_kg": "Carbohydrates (kg)",
-            "total_fiber_kg": "Fibers (kg)",
-            "total_sugar_kg": "Sugars (kg)",
-            "total_vitamin_d_kg": "Vitamin D (kg)",
-            "total_calcium_kg": "Calcium (kg)",
-            "total_potassium_kg": "Potassium (kg)",
-            "total_iron_kg": "Iron (kg)",
+            "total_calories": "Imported Calories (kcal)",
+            "total_fats_kg": "Imported Fats (kg)",
+            "total_sugars_kg": "Imported Sugars (kg)",
+            "total_protein_kg": "Imported Proteins (kg)",
+            "total_saturated_fat_kg": "Imported Saturated Fats (kg)",
+            "total_cholesterol_kg": "Imported Cholesterol (kg)",
+            "total_sodium_kg": "Imported Sodium (kg)",
+            "total_carbohydrate_kg": "Imported Carbohydrates (kg)",
+            "total_fiber_kg": "Imported Fibers (kg)",
+            "total_sugar_kg": "Imported Sugars (kg)",
+            "total_vitamin_d_kg": "Imported Vitamin D (kg)",
+            "total_calcium_kg": "Imported Calcium (kg)",
+            "total_potassium_kg": "Imported Potassium (kg)",
+            "total_iron_kg": "Imported Iron (kg)",
         }
 
         data = (
@@ -313,10 +313,10 @@ class DataCal(JPTrade):
         dropdown = alt.binding_select(
             options=list(column_label_map.keys()),
             labels=list(column_label_map.values()),
-            name="Nutrient: ",
+            name="Imported Nutrient: ",
         )
         ycol_param = alt.param(
-            name="selected_metric", value="total_iron_kg", bind=dropdown
+            name="selected_metric", value="total_calories", bind=dropdown
         )
 
         # 3. Selection parameter for interactive hover tooltips
@@ -325,7 +325,7 @@ class DataCal(JPTrade):
         # Define standard tooltips for reusable encoding
         tooltip_config = [
             alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
-            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
+            alt.Tooltip("selected_value:Q", title="Imported Value", format=",.2f"),
         ]
 
         # 4. Base chart with calculated field
@@ -336,6 +336,7 @@ class DataCal(JPTrade):
         )
 
         # 5. Primary line chart
+        # Using labelExpr to replace 'G' with 'B' in the rendered axis label text
         line = base.mark_line(
             color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
         ).encode(
@@ -347,6 +348,7 @@ class DataCal(JPTrade):
                 title=None,
                 axis=alt.Axis(
                     format="~s",
+                    labelExpr="replace(datum.label, 'G', 'B')",
                     gridDash=[2, 2],
                     gridColor="#E0E0E0",
                 ),
@@ -378,8 +380,8 @@ class DataCal(JPTrade):
                 width="container",
                 height=380,
                 title=alt.TitleParams(
-                    text="Nutritional Intake Over Time",
-                    subtitle="Select a nutrient from the dropdown menu below to update the view.",
+                    text="Imported Nutritional Intake Over Time",
+                    subtitle="Select an imported nutrient from the dropdown menu below to update the view.",
                     fontSize=16,
                     subtitleFontSize=12,
                     anchor="start",
@@ -442,14 +444,14 @@ class DataCal(JPTrade):
         if data.empty:
             return alt.Chart(data).mark_text(text="No data available")
 
-        # Dropdown binding parameter for nutrients
+        # Dropdown binding parameter for nutrients (Default updated to total_calories)
         dropdown = alt.binding_select(
             options=list(column_label_map.keys()),
             labels=list(column_label_map.values()),
             name="Nutrient: ",
         )
         ycol_param = alt.param(
-            name="selected_metric", value="total_iron_kg", bind=dropdown
+            name="selected_metric", value="total_calories", bind=dropdown
         )
 
         # Selection parameter for interactive hover tooltips
@@ -507,21 +509,21 @@ class DataCal(JPTrade):
             .add_params(hover_select)
         )
 
-        # Dynamic subtitle based on selection
+        # Dynamic subtitle based on selection (Updated for import data context)
         subtitle_map = {
-            "imported": "Showing imported nutritional intake.",
-            "local": "Showing local nutritional intake.",
-            "both": "Showing combined imported + local nutritional intake.",
+            "imported": "Showing imported nutritional intake data.",
+            "local": "Showing local nutritional intake data.",
+            "both": "Showing combined imported + local nutritional intake data.",
         }
 
-        # Combine layers & apply styling
+        # Combine layers & apply styling with updated import-focused title
         final_chart = (
             alt.layer(line, points, selectors)
             .properties(
                 width="container",
                 height=380,
                 title=alt.TitleParams(
-                    text="Nutritional Intake by Fiscal Year",
+                    text="Import Nutritional Intake by Fiscal Year",
                     subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
                     fontSize=16,
                     subtitleFontSize=12,
