@@ -1,3 +1,12 @@
+## [0.13.0] - 2026-07-27
+
+### 🚀 Features
+
+- *(data_process.py)* Add `gen_graphs_nuti_data_fiscal` method to generate fiscal year-based nutritional intake charts
+
+### 🚜 Refactor
+
+- *(data_process.py)* Improve data processing logic by adding unique 2-digit HTS prefixes dropdown selector and dynamic slider for fiscal year selection, enhance chart styling and layout for better readability
 ## [0.11.1] - 2026-07-27
 
 ### 🐛 Bug Fixes
@@ -13,7 +22,7 @@
 ### 🐛 Bug Fixes
 
 - *(data_process.py)* Correct agriculture filter parameter in process_price method to False
-## [0.10.0] - 2026-07-15
+## [0.10.1] - 2026-07-15
 
 ### 🐛 Bug Fixes
 

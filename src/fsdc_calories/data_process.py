@@ -1,12 +1,13 @@
 import importlib.resources as resources
 import logging
+from datetime import date, timedelta
 from pathlib import Path
+from typing import Literal
 
 import altair as alt
-from datetime import date, timedelta
 import numpy as np
-import polars as pl
 import pandas as pd
+import polars as pl
 from jp_imports import JPTrade
 
 from .utils.constants import Constants
@@ -279,25 +280,24 @@ class DataCal(JPTrade):
         return df_long
 
     def gen_graphs_nuti_data(self) -> alt.Chart:
-        """Generates an interactive line chart tracking nutritional metrics over time."""
+        """Generates an interactive line chart tracking imported nutritional metrics over time."""
         column_label_map = {
-            "total_calories": "Calories (kcal)",
-            "total_fats_kg": "Fats (kg)",
-            "total_sugars_kg": "Sugars (kg)",
-            "total_protein_kg": "Proteins (kg)",
-            "total_saturated_fat_kg": "Saturated Fats (kg)",
-            "total_cholesterol_kg": "Cholesterol (kg)",
-            "total_sodium_kg": "Sodium (kg)",
-            "total_carbohydrate_kg": "Carbohydrates (kg)",
-            "total_fiber_kg": "Fibers (kg)",
-            "total_sugar_kg": "Sugars (kg)",
-            "total_vitamin_d_kg": "Vitamin D (kg)",
-            "total_calcium_kg": "Calcium (kg)",
-            "total_potassium_kg": "Potassium (kg)",
-            "total_iron_kg": "Iron (kg)",
+            "total_calories": "Imported Calories (kcal)",
+            "total_fats_kg": "Imported Fats (kg)",
+            "total_sugars_kg": "Imported Sugars (kg)",
+            "total_protein_kg": "Imported Proteins (kg)",
+            "total_saturated_fat_kg": "Imported Saturated Fats (kg)",
+            "total_cholesterol_kg": "Imported Cholesterol (kg)",
+            "total_sodium_kg": "Imported Sodium (kg)",
+            "total_carbohydrate_kg": "Imported Carbohydrates (kg)",
+            "total_fiber_kg": "Imported Fibers (kg)",
+            "total_sugar_kg": "Imported Sugars (kg)",
+            "total_vitamin_d_kg": "Imported Vitamin D (kg)",
+            "total_calcium_kg": "Imported Calcium (kg)",
+            "total_potassium_kg": "Imported Potassium (kg)",
+            "total_iron_kg": "Imported Iron (kg)",
         }
 
-        # 1. Pre-aggregate data using Polars
         data = (
             self.gen_nuti_data(time_frame="monthly")
             .group_by("datetime")
@@ -313,10 +313,10 @@ class DataCal(JPTrade):
         dropdown = alt.binding_select(
             options=list(column_label_map.keys()),
             labels=list(column_label_map.values()),
-            name="Nutrient: ",
+            name="Imported Nutrient: ",
         )
         ycol_param = alt.param(
-            name="selected_metric", value="total_iron_kg", bind=dropdown
+            name="selected_metric", value="total_calories", bind=dropdown
         )
 
         # 3. Selection parameter for interactive hover tooltips
@@ -325,7 +325,7 @@ class DataCal(JPTrade):
         # Define standard tooltips for reusable encoding
         tooltip_config = [
             alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
-            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
+            alt.Tooltip("selected_value:Q", title="Imported Value", format=",.2f"),
         ]
 
         # 4. Base chart with calculated field
@@ -336,6 +336,7 @@ class DataCal(JPTrade):
         )
 
         # 5. Primary line chart
+        # Using labelExpr to replace 'G' with 'B' in the rendered axis label text
         line = base.mark_line(
             color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
         ).encode(
@@ -347,6 +348,7 @@ class DataCal(JPTrade):
                 title=None,
                 axis=alt.Axis(
                     format="~s",
+                    labelExpr="replace(datum.label, 'G', 'B')",
                     gridDash=[2, 2],
                     gridColor="#E0E0E0",
                 ),
@@ -378,8 +380,151 @@ class DataCal(JPTrade):
                 width="container",
                 height=380,
                 title=alt.TitleParams(
-                    text="Nutritional Intake Over Time",
-                    subtitle="Select a nutrient from the dropdown menu below to update the view.",
+                    text="Imported Nutritional Intake Over Time",
+                    subtitle="Select an imported nutrient from the dropdown menu below to update the view.",
+                    fontSize=16,
+                    subtitleFontSize=12,
+                    anchor="start",
+                ),
+            )
+            .configure_view(strokeWidth=0)
+            .configure_axis(labelFontSize=11, titleFontSize=12)
+        )
+
+        return final_chart
+
+    def gen_graphs_nuti_data_fiscal(
+        self, source: Literal["imported", "local", "both"] = "both"
+    ) -> alt.Chart:
+        """Generates an interactive line chart tracking nutritional metrics over fiscal years.
+
+        :param source: Data source to display - 'imported', 'local', or 'both'
+            (sum of imported + local).
+        """
+        column_label_map = {
+            "total_calories": "Calories (kcal)",
+            "total_fats_kg": "Fats (kg)",
+            "total_sugars_kg": "Sugars (kg)",
+            "total_protein_kg": "Proteins (kg)",
+            "total_saturated_fat_kg": "Saturated Fats (kg)",
+            "total_cholesterol_kg": "Cholesterol (kg)",
+            "total_sodium_kg": "Sodium (kg)",
+            "total_carbohydrate_kg": "Carbohydrates (kg)",
+            "total_fiber_kg": "Fibers (kg)",
+            "total_sugar_kg": "Sugars (kg)",
+            "total_vitamin_d_kg": "Vitamin D (kg)",
+            "total_calcium_kg": "Calcium (kg)",
+            "total_potassium_kg": "Potassium (kg)",
+            "total_iron_kg": "Iron (kg)",
+        }
+
+        # Fetch data based on selected source option
+        if source == "imported":
+            data = self.gen_nuti_data(time_frame="fiscal")
+        elif source == "local":
+            data = self.gen_nuti_data_local()
+        elif source == "both":
+            df_imports = self.gen_nuti_data(time_frame="fiscal")
+            df_local = self.gen_nuti_data_local()
+            data = df_imports.vstack(df_local)
+            data = data.filter(pl.col("fiscal_year") > 2009)
+        else:
+            raise ValueError(
+                f"Invalid source '{source}'. Expected 'imported', 'local', or 'both'."
+            )
+
+        # Process and aggregate Polars DataFrame
+        data = (
+            data.group_by("fiscal_year")
+            .agg([pl.col(c).sum() for c in column_label_map.keys()])
+            .sort("fiscal_year")
+            .to_pandas()
+        )
+
+        if data.empty:
+            return alt.Chart(data).mark_text(text="No data available")
+
+        # Dropdown binding parameter for nutrients (Default updated to total_calories)
+        dropdown = alt.binding_select(
+            options=list(column_label_map.keys()),
+            labels=list(column_label_map.values()),
+            name="Nutrient: ",
+        )
+        ycol_param = alt.param(
+            name="selected_metric", value="total_calories", bind=dropdown
+        )
+
+        # Selection parameter for interactive hover tooltips
+        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
+
+        # Tooltips formatted for integer year and metric values
+        tooltip_config = [
+            alt.Tooltip("fiscal_year:Q", title="Fiscal Year", format="d"),
+            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
+        ]
+
+        # Base chart with calculated field
+        base = (
+            alt.Chart(data)
+            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
+            .add_params(ycol_param)
+        )
+
+        # Primary line chart
+        line = base.mark_line(
+            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
+        ).encode(
+            x=alt.X(
+                "fiscal_year:Q",
+                title="Fiscal Year",
+                axis=alt.Axis(grid=False, format="d", tickMinStep=1),
+            ),
+            y=alt.Y(
+                "selected_value:Q",
+                title=None,
+                axis=alt.Axis(
+                    gridDash=[2, 2],
+                    gridColor="#E0E0E0",
+                    labelExpr="replace(datum.label, 'G', 'B')",
+                    format="~s",
+                ),
+            ),
+        )
+
+        # Interactive hover points & tooltips
+        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
+            x="fiscal_year:Q",
+            y="selected_value:Q",
+            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
+            tooltip=tooltip_config,
+        )
+
+        # Transparent rule selector for hover snapping
+        selectors = (
+            base.mark_rule(strokeWidth=20, opacity=0)
+            .encode(
+                x="fiscal_year:Q",
+                tooltip=tooltip_config,
+            )
+            .add_params(hover_select)
+        )
+
+        # Dynamic subtitle based on selection (Updated for import data context)
+        subtitle_map = {
+            "imported": "Showing imported nutritional intake data.",
+            "local": "Showing local nutritional intake data.",
+            "both": "Showing combined imported + local nutritional intake data.",
+        }
+
+        # Combine layers & apply styling with updated import-focused title
+        final_chart = (
+            alt.layer(line, points, selectors)
+            .properties(
+                width="container",
+                height=380,
+                title=alt.TitleParams(
+                    text="Import Nutritional Intake by Fiscal Year",
+                    subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
                     fontSize=16,
                     subtitleFontSize=12,
                     anchor="start",
@@ -656,23 +801,10 @@ class DataCal(JPTrade):
             .configure_view(strokeWidth=0)
         )
 
-    def gen_graphs_local_dist(self) -> alt.ConcatChart:
-        # 1. Find the HTS codes that exist in BOTH dataframes (Intersection)
-        # INFO: This should be merged for better logic.
-        df_local = self.gen_nuti_data_local()
-        df_local = df_local.filter(pl.col("fiscal_year") > 2009)
+    def gen_graphs_local_dist(self) -> alt.VConcatChart:
+        # 1. Load dataframes
+        df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2009)
         df_import = self.gen_nuti_data()
-        df_import = df_import.with_columns(
-            total_calories=pl.when(pl.col("total_calories") < 0)
-            .then(0)
-            .otherwise(pl.col("total_calories"))
-        )
-
-        shared_hts = set(df_import["hts_code"]).intersection(set(df_local["hts_code"]))
-
-        df_import_filtered = df_import.filter(
-            pl.col("hts_code").is_in(shared_hts)
-        ).with_columns(pl.lit("Import").alias("source_type"))
 
         # A robust renaming map that strips out _g, _mg, _iu before adding _kg
         rename_mapping = {}
@@ -682,7 +814,6 @@ class DataCal(JPTrade):
                 and col != "total_calories"
                 and not col.endswith("_kg")
             ):
-                # Strip old unit suffixes from the base name if they exist
                 clean_name = col
                 for suffix in ["_g", "_mg", "_iu"]:
                     if clean_name.endswith(suffix):
@@ -690,21 +821,32 @@ class DataCal(JPTrade):
                         break
                 rename_mapping[col] = f"{clean_name}_kg"
 
-        df_local_filtered = (
-            df_local.filter(pl.col("hts_code").is_in(shared_hts))
-            .rename(
-                rename_mapping
-            )  # Now perfectly aligns "total_saturated_fat_g" -> "total_saturated_fat_kg"
-            .with_columns(pl.lit("Local").alias("source_type"))
+        # 3. Prepare unfiltered full datasets for both top and bottom charts
+        df_import_all = df_import.with_columns(pl.lit("Import").alias("source_type"))
+        df_local_all = df_local.rename(rename_mapping).with_columns(pl.lit("Local").alias("source_type"))
+        
+        source_df = pl.concat([df_import_all, df_local_all])
+        pie_source_df = source_df
+
+        # Extract unique 2-digit HTS prefixes sorted alphabetically/numerically for the dropdown selector
+        unique_prefixes = sorted(
+            list(
+                source_df.select(
+                    pl.col("hts_code").cast(pl.String).str.slice(0, 2)
+                )
+                .unique()
+                .to_series()
+            )
         )
-        # 3. Concatenate the filtered Polars dataframes
-        source_df = pl.concat([df_import_filtered, df_local_filtered])
+        
+        if not unique_prefixes:
+            unique_prefixes = ["00"]
 
         # 4. Dynamically find the min and max fiscal years for the slider
-        min_year = int(source_df["fiscal_year"].min())
-        max_year = int(source_df["fiscal_year"].max())
+        min_year = int(pie_source_df["fiscal_year"].min())
+        max_year = int(pie_source_df["fiscal_year"].max())
 
-        # 5. Create the slider and selection point for 'fiscal_year'
+        # 5. Create bindings: Year slider and HTS 2-digit Chapter dropdown selector
         slider = alt.binding_range(
             min=min_year, max=max_year, step=1, name="Select Year: "
         )
@@ -712,23 +854,44 @@ class DataCal(JPTrade):
             name="fiscal_year", fields=["fiscal_year"], bind=slider, value=max_year
         )
 
+        # Dropdown selection widget for the first 2 digits of HTS code
+        hts_dropdown = alt.binding_select(
+            options=unique_prefixes, 
+            name="HTS Chapter (First 2 Digits): "
+        )
+        select_chapter = alt.selection_point(
+            name="hts_chapter", 
+            fields=["hts_prefix"], 
+            bind=hts_dropdown, 
+            value=[{"hts_prefix": unique_prefixes[0]}]
+        )
+
         # 6. Define a cohesive, professional color palette
         color_scale = alt.Scale(
             domain=["Import", "Local"], range=["#1f4e79", "#2d8a81"]
         )
 
-        # 7. Define the base chart configuration with clean typography and % calculations
+        # 7. Define the base chart configuration (Shared by bottom charts with 0-imputation)
         base = (
             alt.Chart(source_df)
             .transform_filter(select_year)
             .transform_calculate(
-                # Step A: Isolate local calories per row BEFORE any chart-level filtering happens
+                hts_prefix=alt.expr.slice(alt.expr.toString(alt.datum.hts_code), 0, 2)
+            )
+            .transform_filter(select_chapter)
+            .transform_impute(
+                "total_calories",
+                key="source_type",
+                keyvals=["Import", "Local"],
+                value=0,
+                groupby=["hts_code", "fiscal_year"]
+            )
+            .transform_calculate(
                 is_local_cal=alt.expr.if_(
                     alt.datum.source_type == "Local", alt.datum.total_calories, 0
                 )
             )
             .transform_joinaggregate(
-                # Step B: Sum the isolated local calories globally per HTS code/year block
                 global_local_calories="sum(is_local_cal)",
                 hts_total="sum(total_calories)",
                 groupby=["hts_code", "fiscal_year"],
@@ -738,22 +901,94 @@ class DataCal(JPTrade):
                 groupby=["hts_code", "source_type", "fiscal_year"],
             )
             .transform_calculate(
-                # Calculate the percentage contribution per year block
-                pct=alt.datum.source_hts_total
-                / alt.datum.hts_total
+                pct=alt.expr.if_(
+                    alt.datum.hts_total > 0,
+                    alt.datum.source_hts_total / alt.datum.hts_total,
+                    0
+                )
             )
-            .properties(width=280, height=alt.Step(20))
         )
 
-        # FIXED SORTING LOGIC: Uses the global aggregated 'global_local_calories' field
+        # Shared sorting logic for bottom breakdown
         y_sort_axis = alt.Y("hts_code:O").sort(
             field="global_local_calories", op="max", order="descending"
         )
 
-        # --- CHART COLUMNS ---
+        # ==========================================
+        # TOP CHART (Pie Chart with 0-fill logic)
+        # ==========================================
+        top_base = (
+            alt.Chart(pie_source_df)
+            .transform_filter(select_year)
+            .transform_aggregate(
+                source_total_calories="sum(total_calories)",
+                groupby=["fiscal_year", "source_type"]
+            )
+            .transform_impute(
+                "source_total_calories",
+                key="source_type",
+                keyvals=["Import", "Local"],
+                value=0,
+                groupby=["fiscal_year"]
+            )
+            .transform_joinaggregate(
+                grand_total_calories="sum(source_total_calories)",
+                groupby=["fiscal_year"]
+            )
+            .transform_calculate(
+                pie_pct=alt.expr.if_(
+                    alt.datum.grand_total_calories > 0,
+                    alt.datum.source_total_calories / alt.datum.grand_total_calories,
+                    0
+                )
+            )
+            .encode(
+                theta=alt.Theta("source_total_calories:Q").stack(True),
+                color=alt.Color("source_type:N")
+                .scale(color_scale)
+                .legend(orient="top", title="Source Type"),
+            )
+        )
+
+        top_pie = top_base.mark_arc(outerRadius=80).encode(
+            tooltip=[
+                alt.Tooltip("source_type:N", title="Source"),
+                alt.Tooltip(
+                    "source_total_calories:Q", title="Total Calories", format="~s"
+                ),
+                alt.Tooltip("pie_pct:Q", title="Market Share", format=".1%")
+            ]
+        )
+
+        top_labels = top_base.mark_text(
+            radius=110,
+            font="Arial",
+            fontSize=11,
+            fontWeight="bold",
+            color="#333333",
+        ).encode(text=alt.Text("pie_pct:Q", format=".1%"))
+
+        top_chart = alt.layer(top_pie, top_labels).properties(
+            width=640,
+            height=240,
+            title=alt.TitleParams(
+                "Total Market Share Breakdown (All Data Sources Combined)",
+                anchor="start",
+                font="Arial",
+                fontSize=13,
+                color="#333333",
+            ),
+        )
+
+        # ==========================================
+        # BOTTOM ROW: Side-by-Side Split Charts
+        # ==========================================
+        scrollable_height = alt.Step(20)
 
         # Left Chart: Import data
-        left_base = base.transform_filter(alt.datum.source_type == "Import")
+        left_base = base.transform_filter(alt.datum.source_type == "Import").properties(
+            width=280, height=scrollable_height
+        )
 
         left_bars = left_base.encode(
             y=y_sort_axis.axis(None),
@@ -769,28 +1004,30 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q").sort("descending"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=5,
+            dx=-8,
             align="right",
             baseline="middle",
             font="Arial",
             fontSize=10,
+            fontWeight="bold",
             color="#333333",
         )
 
         left = alt.layer(left_bars, left_text).properties(
             title=alt.TitleParams(
-                "Imported Calories",
+                "Imported Calories Contribution",
                 anchor="end",
                 font="Arial",
                 fontSize=13,
                 color="#333333",
-            )
+            ),
+            height=400
         )
 
         # Middle Chart: Centralized HTS Code Text Labels
         middle = (
             base.transform_aggregate(
-                global_local_calories="max(global_local_calories)",  # Bind sorting metric to middle channel
+                global_local_calories="max(global_local_calories)",
                 groupby=["hts_code"],
             )
             .encode(
@@ -798,11 +1035,18 @@ class DataCal(JPTrade):
                 text=alt.Text("hts_code:O"),
             )
             .mark_text(font="Arial", fontSize=11, color="#555555")
-            .properties(width=60)
+            .properties(
+                width=60, 
+                height=scrollable_height
+            )
         )
+        
+        middle_container = alt.layer(middle).properties(height=400)
 
         # Right Chart: Local data
-        right_base = base.transform_filter(alt.datum.source_type == "Local")
+        right_base = base.transform_filter(alt.datum.source_type == "Local").properties(
+            width=280, height=scrollable_height
+        )
 
         right_bars = right_base.encode(
             y=y_sort_axis.axis(None),
@@ -817,35 +1061,40 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=5,
+            dx=8,
             align="left",
             baseline="middle",
             font="Arial",
             fontSize=10,
+            fontWeight="bold",
             color="#333333",
         )
 
         right = alt.layer(right_bars, right_text).properties(
             title=alt.TitleParams(
-                "Local Calories",
+                "Local Calories Contribution",
                 anchor="start",
                 font="Arial",
                 fontSize=13,
                 color="#333333",
-            )
+            ),
+            height=400
         )
 
+        bottom_row = alt.hconcat(left, middle_container, right, spacing=10)
+
+        # ==========================================
+        # FINAL CONCATENATION & STYLING
+        # ==========================================
         chart = (
-            alt.concat(left, middle, right, spacing=10)
-            .add_params(
-                select_year
-            )  # MOVED HERE: Parameter binds cleanly to the composite chart level
+            alt.vconcat(top_chart, bottom_row, spacing=30)
+            .add_params(select_year, select_chapter)
             .properties(
                 title=alt.TitleParams(
-                    text="Caloric Distribution Comparison",
+                    text="Caloric Distribution Analysis",
                     subtitle=[
-                        "Comparing localized and imported total calories across shared HTS codes.",
-                        " ",
+                        "Overall combined distribution (top) compared with localized and imported breakdowns (bottom).",
+                        "Use the scroll wheel on the bottom charts to explore extensive HTS code chapters.",
                     ],
                     fontSize=16,
                     anchor="middle",
