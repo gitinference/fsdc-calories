@@ -799,17 +799,16 @@ class DataCal(JPTrade):
             .configure_view(strokeWidth=0)
         )
 
-    def gen_graphs_local_dist(self) -> alt.ConcatChart:
+    def gen_graphs_local_dist(self) -> alt.VConcatChart:
         # 1. Find the HTS codes that exist in BOTH dataframes (Intersection)
-        # INFO: This should be merged for better logic.
         df_local = self.gen_nuti_data_local()
         df_local = df_local.filter(pl.col("fiscal_year") > 2009)
         df_import = self.gen_nuti_data()
-        df_import = df_import.with_columns(
-            total_calories=pl.when(pl.col("total_calories") < 0)
-            .then(0)
-            .otherwise(pl.col("total_calories"))
-        )
+        # df_import = df_import.with_columns(
+        #     total_calories=pl.when(pl.col("total_calories") < 0)
+        #     .then(0)
+        #     .otherwise(pl.col("total_calories"))
+        # )
 
         shared_hts = set(df_import["hts_code"]).intersection(set(df_local["hts_code"]))
 
@@ -825,7 +824,6 @@ class DataCal(JPTrade):
                 and col != "total_calories"
                 and not col.endswith("_kg")
             ):
-                # Strip old unit suffixes from the base name if they exist
                 clean_name = col
                 for suffix in ["_g", "_mg", "_iu"]:
                     if clean_name.endswith(suffix):
@@ -835,11 +833,10 @@ class DataCal(JPTrade):
 
         df_local_filtered = (
             df_local.filter(pl.col("hts_code").is_in(shared_hts))
-            .rename(
-                rename_mapping
-            )  # Now perfectly aligns "total_saturated_fat_g" -> "total_saturated_fat_kg"
+            .rename(rename_mapping)
             .with_columns(pl.lit("Local").alias("source_type"))
         )
+
         # 3. Concatenate the filtered Polars dataframes
         source_df = pl.concat([df_import_filtered, df_local_filtered])
 
@@ -860,18 +857,16 @@ class DataCal(JPTrade):
             domain=["Import", "Local"], range=["#1f4e79", "#2d8a81"]
         )
 
-        # 7. Define the base chart configuration with clean typography and % calculations
+        # 7. Define the base chart configuration (Shared by bottom charts)
         base = (
             alt.Chart(source_df)
             .transform_filter(select_year)
             .transform_calculate(
-                # Step A: Isolate local calories per row BEFORE any chart-level filtering happens
                 is_local_cal=alt.expr.if_(
                     alt.datum.source_type == "Local", alt.datum.total_calories, 0
                 )
             )
             .transform_joinaggregate(
-                # Step B: Sum the isolated local calories globally per HTS code/year block
                 global_local_calories="sum(is_local_cal)",
                 hts_total="sum(total_calories)",
                 groupby=["hts_code", "fiscal_year"],
@@ -880,23 +875,68 @@ class DataCal(JPTrade):
                 source_hts_total="sum(total_calories)",
                 groupby=["hts_code", "source_type", "fiscal_year"],
             )
-            .transform_calculate(
-                # Calculate the percentage contribution per year block
-                pct=alt.datum.source_hts_total
-                / alt.datum.hts_total
-            )
-            .properties(width=280, height=alt.Step(20))
+            .transform_calculate(pct=alt.datum.source_hts_total / alt.datum.hts_total)
         )
 
-        # FIXED SORTING LOGIC: Uses the global aggregated 'global_local_calories' field
+        # Shared sorting logic for bottom breakdown
         y_sort_axis = alt.Y("hts_code:O").sort(
             field="global_local_calories", op="max", order="descending"
         )
 
-        # --- CHART COLUMNS ---
+        # ==========================================
+        # UPDATED: TOP CHART (Pie Chart + Exterior Percent Labels)
+        # ==========================================
+        top_base = (
+            alt.Chart(source_df)
+            .transform_filter(select_year)
+            .encode(
+                theta=alt.Theta("sum(total_calories):Q").stack(True),
+                color=alt.Color("source_type:N")
+                .scale(color_scale)
+                .legend(orient="top", title="Source Type"),
+            )
+        )
+
+        # 2. Layer 1: The visual pie slices
+        top_pie = top_base.mark_arc(outerRadius=80).encode(
+            tooltip=[
+                alt.Tooltip("source_type:N", title="Source"),
+                alt.Tooltip(
+                    "sum(total_calories):Q", title="Total Calories", format="~s"
+                ),
+            ]
+        )
+
+        # 3. Layer 2: Percentage text labels placed OUTSIDE the slices for visibility
+        top_labels = top_base.mark_text(
+            radius=110,  # Pushes the text safely outside the pie boundaries
+            font="Arial",
+            fontSize=11,
+            fontWeight="bold",
+            color="#333333",  # High contrast dark text on the empty canvas background
+        ).encode(text=alt.Text("sum(total_calories):Q", format=".1%"))
+
+        # 4. Combine both layers into the final top_chart object
+        top_chart = alt.layer(top_pie, top_labels).properties(
+            width=640,
+            height=240,
+            title=alt.TitleParams(
+                "Total Market Share Breakdown (All HTS Codes Combined)",
+                anchor="start",
+                font="Arial",
+                fontSize=13,
+                color="#333333",
+            ),
+        )
+
+        # ==========================================
+        # BOTTOM ROW: Side-by-Side Split Charts
+        # ==========================================
 
         # Left Chart: Import data
-        left_base = base.transform_filter(alt.datum.source_type == "Import")
+        left_base = base.transform_filter(alt.datum.source_type == "Import").properties(
+            width=280, height=alt.Step(20)
+        )
 
         left_bars = left_base.encode(
             y=y_sort_axis.axis(None),
@@ -912,17 +952,18 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q").sort("descending"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=5,
+            dx=-8,  # Displaced to the left outside the reversed bar
             align="right",
             baseline="middle",
             font="Arial",
             fontSize=10,
+            fontWeight="bold",
             color="#333333",
         )
 
         left = alt.layer(left_bars, left_text).properties(
             title=alt.TitleParams(
-                "Imported Calories",
+                "Imported Calories Contribution",
                 anchor="end",
                 font="Arial",
                 fontSize=13,
@@ -933,7 +974,7 @@ class DataCal(JPTrade):
         # Middle Chart: Centralized HTS Code Text Labels
         middle = (
             base.transform_aggregate(
-                global_local_calories="max(global_local_calories)",  # Bind sorting metric to middle channel
+                global_local_calories="max(global_local_calories)",
                 groupby=["hts_code"],
             )
             .encode(
@@ -941,11 +982,13 @@ class DataCal(JPTrade):
                 text=alt.Text("hts_code:O"),
             )
             .mark_text(font="Arial", fontSize=11, color="#555555")
-            .properties(width=60)
+            .properties(width=60, height=alt.Step(20))
         )
 
         # Right Chart: Local data
-        right_base = base.transform_filter(alt.datum.source_type == "Local")
+        right_base = base.transform_filter(alt.datum.source_type == "Local").properties(
+            width=280, height=alt.Step(20)
+        )
 
         right_bars = right_base.encode(
             y=y_sort_axis.axis(None),
@@ -960,17 +1003,18 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=5,
+            dx=8,  # Displaced to the right outside the standard bar
             align="left",
             baseline="middle",
             font="Arial",
             fontSize=10,
+            fontWeight="bold",
             color="#333333",
         )
 
         right = alt.layer(right_bars, right_text).properties(
             title=alt.TitleParams(
-                "Local Calories",
+                "Local Calories Contribution",
                 anchor="start",
                 font="Arial",
                 fontSize=13,
@@ -978,16 +1022,20 @@ class DataCal(JPTrade):
             )
         )
 
+        # Combine Left, Middle, and Right into a single row layout
+        bottom_row = alt.hconcat(left, middle, right, spacing=10)
+
+        # ==========================================
+        # FINAL CONCATENATION & STYLING
+        # ==========================================
         chart = (
-            alt.concat(left, middle, right, spacing=10)
-            .add_params(
-                select_year
-            )  # MOVED HERE: Parameter binds cleanly to the composite chart level
+            alt.vconcat(top_chart, bottom_row, spacing=30)
+            .add_params(select_year)
             .properties(
                 title=alt.TitleParams(
-                    text="Caloric Distribution Comparison",
+                    text="Caloric Distribution Analysis",
                     subtitle=[
-                        "Comparing localized and imported total calories across shared HTS codes.",
+                        "Overall combined distribution (top) compared with localized and imported breakdowns (bottom).",
                         " ",
                     ],
                     fontSize=16,
