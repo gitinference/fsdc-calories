@@ -1,3 +1,8 @@
+## [0.11.1] - 2026-07-27
+
+### 🐛 Bug Fixes
+
+- *(data_process.py)* Update the local data file
 ## [0.11.0] - 2026-07-21
 
 ### 🐛 Bug Fixes
@@ -8,7 +13,7 @@
 ### 🐛 Bug Fixes
 
 - *(data_process.py)* Correct agriculture filter parameter in process_price method to False
-## [0.10.1] - 2026-07-15
+## [0.10.0] - 2026-07-15
 
 ### 🐛 Bug Fixes
 

@@ -124,8 +124,8 @@ class DataCal(JPTrade):
             )
         )
         df_local = df_local.with_columns(
-            hts_code=pl.col("schedule_b").cast(pl.String).str.zfill(4),
-            net_qty=pl.col("cantidad_convertida_mediana"),
+            hts_code=pl.col("hts").cast(pl.String).str.zfill(4),
+            net_qty=pl.col("produccion_kg"),
             fiscal_year=pl.col("fiscal_year").cast(pl.Int32),
         )
         df_local = df_local.select(pl.col("fiscal_year", "hts_code", "net_qty"))
