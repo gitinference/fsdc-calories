@@ -1,8 +1,8 @@
-## [0.11.1] - 2026-07-27
+## [0.12.0] - 2026-07-21
 
-### 🐛 Bug Fixes
+### 🚀 Features
 
-- *(data_process.py)* Update the local data file
+- *(data_process.py)* Add `gen_graphs_nuti_data_fiscal` method to generate fiscal year-based nutritional intake charts
 ## [0.11.0] - 2026-07-21
 
 ### 🐛 Bug Fixes
