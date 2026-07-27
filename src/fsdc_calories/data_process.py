@@ -802,21 +802,9 @@ class DataCal(JPTrade):
         )
 
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
-        # 1. Find the HTS codes that exist in BOTH dataframes (Intersection)
-        df_local = self.gen_nuti_data_local()
-        df_local = df_local.filter(pl.col("fiscal_year") > 2009)
+        # 1. Load dataframes
+        df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2009)
         df_import = self.gen_nuti_data()
-        # df_import = df_import.with_columns(
-        #     total_calories=pl.when(pl.col("total_calories") < 0)
-        #     .then(0)
-        #     .otherwise(pl.col("total_calories"))
-        # )
-
-        shared_hts = set(df_import["hts_code"]).intersection(set(df_local["hts_code"]))
-
-        df_import_filtered = df_import.filter(
-            pl.col("hts_code").is_in(shared_hts)
-        ).with_columns(pl.lit("Import").alias("source_type"))
 
         # A robust renaming map that strips out _g, _mg, _iu before adding _kg
         rename_mapping = {}
@@ -833,18 +821,17 @@ class DataCal(JPTrade):
                         break
                 rename_mapping[col] = f"{clean_name}_kg"
 
-        df_local_filtered = (
-            df_local.filter(pl.col("hts_code").is_in(shared_hts))
-            .rename(rename_mapping)
-            .with_columns(pl.lit("Local").alias("source_type"))
-        )
-
-        # 3. Concatenate the filtered Polars dataframes
-        source_df = pl.concat([df_import_filtered, df_local_filtered])
+        # 3. Prepare unfiltered full datasets for both top and bottom charts
+        df_import_all = df_import.with_columns(pl.lit("Import").alias("source_type"))
+        df_local_all = df_local.rename(rename_mapping).with_columns(pl.lit("Local").alias("source_type"))
+        
+        # Combine into a single source for the bottom charts, capturing ALL HTS codes
+        source_df = pl.concat([df_import_all, df_local_all])
+        pie_source_df = source_df
 
         # 4. Dynamically find the min and max fiscal years for the slider
-        min_year = int(source_df["fiscal_year"].min())
-        max_year = int(source_df["fiscal_year"].max())
+        min_year = int(pie_source_df["fiscal_year"].min())
+        max_year = int(pie_source_df["fiscal_year"].max())
 
         # 5. Create the slider and selection point for 'fiscal_year'
         slider = alt.binding_range(
@@ -859,10 +846,18 @@ class DataCal(JPTrade):
             domain=["Import", "Local"], range=["#1f4e79", "#2d8a81"]
         )
 
-        # 7. Define the base chart configuration (Shared by bottom charts)
+        # 7. Define the base chart configuration (Shared by bottom charts with 0-imputation)
         base = (
             alt.Chart(source_df)
             .transform_filter(select_year)
+            # Ensure every HTS code has both 'Import' and 'Local' rows per fiscal year (filling missing with 0 calories)
+            .transform_impute(
+                "total_calories",
+                key="source_type",
+                keyvals=["Import", "Local"],
+                value=0,
+                groupby=["hts_code", "fiscal_year"]
+            )
             .transform_calculate(
                 is_local_cal=alt.expr.if_(
                     alt.datum.source_type == "Local", alt.datum.total_calories, 0
@@ -877,53 +872,80 @@ class DataCal(JPTrade):
                 source_hts_total="sum(total_calories)",
                 groupby=["hts_code", "source_type", "fiscal_year"],
             )
-            .transform_calculate(pct=alt.datum.source_hts_total / alt.datum.hts_total)
+            # If hts_total is 0, default pct to 0 to avoid division by zero; otherwise compute share
+            .transform_calculate(
+                pct=alt.expr.if_(
+                    alt.datum.hts_total > 0,
+                    alt.datum.source_hts_total / alt.datum.hts_total,
+                    0
+                )
+            )
         )
 
-        # Shared sorting logic for bottom breakdown
+        # Shared sorting logic for bottom breakdown based on total local calories across all available codes
         y_sort_axis = alt.Y("hts_code:O").sort(
             field="global_local_calories", op="max", order="descending"
         )
 
         # ==========================================
-        # UPDATED: TOP CHART (Pie Chart + Exterior Percent Labels)
+        # TOP CHART (Pie Chart with 0-fill logic)
         # ==========================================
         top_base = (
-            alt.Chart(source_df)
+            alt.Chart(pie_source_df)
             .transform_filter(select_year)
+            .transform_aggregate(
+                source_total_calories="sum(total_calories)",
+                groupby=["fiscal_year", "source_type"]
+            )
+            .transform_impute(
+                "source_total_calories",
+                key="source_type",
+                keyvals=["Import", "Local"],
+                value=0,
+                groupby=["fiscal_year"]
+            )
+            .transform_joinaggregate(
+                grand_total_calories="sum(source_total_calories)",
+                groupby=["fiscal_year"]
+            )
+            .transform_calculate(
+                pie_pct=alt.expr.if_(
+                    alt.datum.grand_total_calories > 0,
+                    alt.datum.source_total_calories / alt.datum.grand_total_calories,
+                    0
+                )
+            )
             .encode(
-                theta=alt.Theta("sum(total_calories):Q").stack(True),
+                theta=alt.Theta("source_total_calories:Q").stack(True),
                 color=alt.Color("source_type:N")
                 .scale(color_scale)
                 .legend(orient="top", title="Source Type"),
             )
         )
 
-        # 2. Layer 1: The visual pie slices
         top_pie = top_base.mark_arc(outerRadius=80).encode(
             tooltip=[
                 alt.Tooltip("source_type:N", title="Source"),
                 alt.Tooltip(
-                    "sum(total_calories):Q", title="Total Calories", format="~s"
+                    "source_total_calories:Q", title="Total Calories", format="~s"
                 ),
+                alt.Tooltip("pie_pct:Q", title="Market Share", format=".1%")
             ]
         )
 
-        # 3. Layer 2: Percentage text labels placed OUTSIDE the slices for visibility
         top_labels = top_base.mark_text(
-            radius=110,  # Pushes the text safely outside the pie boundaries
+            radius=110,
             font="Arial",
             fontSize=11,
             fontWeight="bold",
-            color="#333333",  # High contrast dark text on the empty canvas background
-        ).encode(text=alt.Text("sum(total_calories):Q", format=".1%"))
+            color="#333333",
+        ).encode(text=alt.Text("pie_pct:Q", format=".1%"))
 
-        # 4. Combine both layers into the final top_chart object
         top_chart = alt.layer(top_pie, top_labels).properties(
             width=640,
             height=240,
             title=alt.TitleParams(
-                "Total Market Share Breakdown (All HTS Codes Combined)",
+                "Total Market Share Breakdown (All Data Sources Combined)",
                 anchor="start",
                 font="Arial",
                 fontSize=13,
@@ -954,7 +976,7 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q").sort("descending"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=-8,  # Displaced to the left outside the reversed bar
+            dx=-8,
             align="right",
             baseline="middle",
             font="Arial",
@@ -1005,7 +1027,7 @@ class DataCal(JPTrade):
             x=alt.X("sum(total_calories):Q"),
             text=alt.Text("max(pct):Q", format=".1%"),
         ).mark_text(
-            dx=8,  # Displaced to the right outside the standard bar
+            dx=8,
             align="left",
             baseline="middle",
             font="Arial",
@@ -1024,7 +1046,6 @@ class DataCal(JPTrade):
             )
         )
 
-        # Combine Left, Middle, and Right into a single row layout
         bottom_row = alt.hconcat(left, middle, right, spacing=10)
 
         # ==========================================
