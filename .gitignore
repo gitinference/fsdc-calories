@@ -37,6 +37,9 @@ MANIFEST
 *.parquet
 *.zip
 *.xlsx
+*.dta
+*.do
+*.stswp
 
 # Exeption for requirements
 !requirements.txt
