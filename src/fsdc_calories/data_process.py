@@ -825,20 +825,45 @@ class DataCal(JPTrade):
         df_import_all = df_import.with_columns(pl.lit("Import").alias("source_type"))
         df_local_all = df_local.rename(rename_mapping).with_columns(pl.lit("Local").alias("source_type"))
         
-        # Combine into a single source for the bottom charts, capturing ALL HTS codes
         source_df = pl.concat([df_import_all, df_local_all])
         pie_source_df = source_df
+
+        # Extract unique 2-digit HTS prefixes sorted alphabetically/numerically for the dropdown selector
+        unique_prefixes = sorted(
+            list(
+                source_df.select(
+                    pl.col("hts_code").cast(pl.String).str.slice(0, 2)
+                )
+                .unique()
+                .to_series()
+            )
+        )
+        
+        if not unique_prefixes:
+            unique_prefixes = ["00"]
 
         # 4. Dynamically find the min and max fiscal years for the slider
         min_year = int(pie_source_df["fiscal_year"].min())
         max_year = int(pie_source_df["fiscal_year"].max())
 
-        # 5. Create the slider and selection point for 'fiscal_year'
+        # 5. Create bindings: Year slider and HTS 2-digit Chapter dropdown selector
         slider = alt.binding_range(
             min=min_year, max=max_year, step=1, name="Select Year: "
         )
         select_year = alt.selection_point(
             name="fiscal_year", fields=["fiscal_year"], bind=slider, value=max_year
+        )
+
+        # Dropdown selection widget for the first 2 digits of HTS code
+        hts_dropdown = alt.binding_select(
+            options=unique_prefixes, 
+            name="HTS Chapter (First 2 Digits): "
+        )
+        select_chapter = alt.selection_point(
+            name="hts_chapter", 
+            fields=["hts_prefix"], 
+            bind=hts_dropdown, 
+            value=[{"hts_prefix": unique_prefixes[0]}]
         )
 
         # 6. Define a cohesive, professional color palette
@@ -850,7 +875,10 @@ class DataCal(JPTrade):
         base = (
             alt.Chart(source_df)
             .transform_filter(select_year)
-            # Ensure every HTS code has both 'Import' and 'Local' rows per fiscal year (filling missing with 0 calories)
+            .transform_calculate(
+                hts_prefix=alt.expr.slice(alt.expr.toString(alt.datum.hts_code), 0, 2)
+            )
+            .transform_filter(select_chapter)
             .transform_impute(
                 "total_calories",
                 key="source_type",
@@ -872,7 +900,6 @@ class DataCal(JPTrade):
                 source_hts_total="sum(total_calories)",
                 groupby=["hts_code", "source_type", "fiscal_year"],
             )
-            # If hts_total is 0, default pct to 0 to avoid division by zero; otherwise compute share
             .transform_calculate(
                 pct=alt.expr.if_(
                     alt.datum.hts_total > 0,
@@ -882,7 +909,7 @@ class DataCal(JPTrade):
             )
         )
 
-        # Shared sorting logic for bottom breakdown based on total local calories across all available codes
+        # Shared sorting logic for bottom breakdown
         y_sort_axis = alt.Y("hts_code:O").sort(
             field="global_local_calories", op="max", order="descending"
         )
@@ -956,10 +983,11 @@ class DataCal(JPTrade):
         # ==========================================
         # BOTTOM ROW: Side-by-Side Split Charts
         # ==========================================
+        scrollable_height = alt.Step(20)
 
         # Left Chart: Import data
         left_base = base.transform_filter(alt.datum.source_type == "Import").properties(
-            width=280, height=alt.Step(20)
+            width=280, height=scrollable_height
         )
 
         left_bars = left_base.encode(
@@ -992,7 +1020,8 @@ class DataCal(JPTrade):
                 font="Arial",
                 fontSize=13,
                 color="#333333",
-            )
+            ),
+            height=400
         )
 
         # Middle Chart: Centralized HTS Code Text Labels
@@ -1006,12 +1035,17 @@ class DataCal(JPTrade):
                 text=alt.Text("hts_code:O"),
             )
             .mark_text(font="Arial", fontSize=11, color="#555555")
-            .properties(width=60, height=alt.Step(20))
+            .properties(
+                width=60, 
+                height=scrollable_height
+            )
         )
+        
+        middle_container = alt.layer(middle).properties(height=400)
 
         # Right Chart: Local data
         right_base = base.transform_filter(alt.datum.source_type == "Local").properties(
-            width=280, height=alt.Step(20)
+            width=280, height=scrollable_height
         )
 
         right_bars = right_base.encode(
@@ -1043,23 +1077,24 @@ class DataCal(JPTrade):
                 font="Arial",
                 fontSize=13,
                 color="#333333",
-            )
+            ),
+            height=400
         )
 
-        bottom_row = alt.hconcat(left, middle, right, spacing=10)
+        bottom_row = alt.hconcat(left, middle_container, right, spacing=10)
 
         # ==========================================
         # FINAL CONCATENATION & STYLING
         # ==========================================
         chart = (
             alt.vconcat(top_chart, bottom_row, spacing=30)
-            .add_params(select_year)
+            .add_params(select_year, select_chapter)
             .properties(
                 title=alt.TitleParams(
                     text="Caloric Distribution Analysis",
                     subtitle=[
                         "Overall combined distribution (top) compared with localized and imported breakdowns (bottom).",
-                        " ",
+                        "Use the scroll wheel on the bottom charts to explore extensive HTS code chapters.",
                     ],
                     fontSize=16,
                     anchor="middle",
