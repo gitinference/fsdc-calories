@@ -937,7 +937,7 @@ wheels = [
 
 [[package]]
 name = "jp-imports"
-version = "1.6.6"
+version = "1.6.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "censusforge" },
@@ -949,9 +949,9 @@ dependencies = [
     { name = "pr-imports" },
     { name = "pyarrow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/34/a7967098e365a8e1186e64537f0330dca357c664d5d347b3fb42c824abbf/jp_imports-1.6.6.tar.gz", hash = "sha256:29ee5006fd1da45fd8d7429116e4b1cbd0f9dbb401d1d4334fbb686f680530e9", size = 189532, upload-time = "2026-07-29T20:50:54.348Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/23/30d48a67504aad7976f64e527c6cdaaa61eb6680cf890dd62cd5cf403643/jp_imports-1.6.7.tar.gz", hash = "sha256:2bbe479d6ae673952a09d63447297918c564892fc0bd7824eaccfb8170cf987d", size = 189720, upload-time = "2026-08-11T17:04:23.434Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/c8/fefcc69ead1b5a6503779360cf690bf9d0a079f1de2a2d2bf6d4d795b9b9/jp_imports-1.6.6-py3-none-any.whl", hash = "sha256:b7da34a7f44b6fb0623ed8088cccf1a9ae5af06d28ab7e1a3373cb381f41ff67", size = 19581, upload-time = "2026-07-29T20:50:53.006Z" },
+    { url = "https://files.pythonhosted.org/packages/67/90/131a6a148d208009ef705a670c86e51e0d35ff15114800643e1f3d519b1e/jp_imports-1.6.7-py3-none-any.whl", hash = "sha256:e25df6ea45f027d13aa86b73f710dd2aa8a85cdb123ee0ccbe685e57423061fd", size = 19683, upload-time = "2026-08-11T17:04:22.103Z" },
 ]
 
 [[package]]
