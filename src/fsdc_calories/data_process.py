@@ -42,9 +42,10 @@ class DataCal(JPTrade):
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
+        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
 
         # 2. Pull trade data using the dynamic timeframe
-        df = self.process_int_jp(time_frame=time_frame, level="hts")
+        df = self.process_int_jp(time_frame=time_frame, level="hts", source="org")
         df = df.with_columns(
             net_qty=pl.when(pl.col("net_qty") < 0)
             .then(pl.lit(0))
@@ -87,22 +88,10 @@ class DataCal(JPTrade):
         )
 
         # Update target metric keys for downstream pipeline steps
-        total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols]
+        total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols] + [
+            "net_qty"
+        ]
 
-        # 5. Apply Empirical Cumulative Distribution Function (ECDF) filters
-        filter_cols = [col for col in total_cols if col != "total_calories"]
-
-        df = df.with_columns(
-            [
-                (pl.col(col).rank("ordinal") / pl.len()).alias(f"{col}_ecdf")
-                for col in filter_cols
-            ]
-        )
-
-        # Combine all filters into a single call
-        df = df.filter([pl.col(f"{col}_ecdf") < 0.9999 for col in filter_cols])
-
-        # 6. Dynamically resolve group-by columns based on time_frame
         time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
         group_keys = time_cols + ["hts_code"]
 
@@ -131,17 +120,12 @@ class DataCal(JPTrade):
         )
         df_local = df_local.select(pl.col("fiscal_year", "hts_code", "net_qty"))
 
-        df_local = df_local.with_columns(
-            net_qty=pl.when(pl.col("net_qty") < 0)
-            .then(pl.lit(0))
-            .otherwise(pl.col("net_qty"))
-        )
-
         nutri_df = pl.read_parquet(
             str(resources.files("fsdc_calories").joinpath("data/nutri_matrix.parquet"))
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
+        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
 
         df_local = df_local.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
         df_local = df_local.join(nutri_df, on="hts_code", how="inner", validate="m:1")
@@ -509,21 +493,32 @@ class DataCal(JPTrade):
             .add_params(hover_select)
         )
 
-        # Dynamic subtitle based on selection (Updated for import data context)
+        # Dynamic subtitles based on selection
         subtitle_map = {
             "imported": "Showing imported nutritional intake data.",
             "local": "Showing local nutritional intake data.",
             "both": "Showing combined imported + local nutritional intake data.",
         }
 
-        # Combine layers & apply styling with updated import-focused title
+        # Map column keys to clean human-readable titles for each choice
+        title_lookup = alt.expr.if_(
+            *[alt.expr.uvg.strContains(ycol_param.name, k), f"'{v}'"] 
+            for k, v in column_label_map.items()
+        )
+        
+        # Alternatively, build a nested expression string for Vega title binding:
+        # Constructing a clean conditional Vega expression for the title string:
+        expr_parts = [f"selected_metric == '{k}' ? '{v} Intake by Fiscal Year'" for k, v in column_label_map.items()]
+        dynamic_title_expr = " : ".join(expr_parts) + " : 'Nutritional Intake by Fiscal Year'"
+
+        # Combine layers & apply styling with dynamic title expression
         final_chart = (
             alt.layer(line, points, selectors)
             .properties(
                 width="container",
                 height=380,
                 title=alt.TitleParams(
-                    text="Import Nutritional Intake by Fiscal Year",
+                    text=alt.expr(dynamic_title_expr),
                     subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
                     fontSize=16,
                     subtitleFontSize=12,
@@ -657,7 +652,7 @@ class DataCal(JPTrade):
         # 1. Data Ingestion & Validation
         # ---------------------------------------------------------
         try:
-            hts_data = self.process_int_jp(time_frame="monthly", level="hts")
+            hts_data = self.process_int_jp(time_frame="monthly", level="hts", source="org")
         except Exception as e:
             logger.error(f"Failed to process internal JP data: {e}")
             return alt.Chart()
@@ -823,22 +818,22 @@ class DataCal(JPTrade):
 
         # 3. Prepare unfiltered full datasets for both top and bottom charts
         df_import_all = df_import.with_columns(pl.lit("Import").alias("source_type"))
-        df_local_all = df_local.rename(rename_mapping).with_columns(pl.lit("Local").alias("source_type"))
-        
+        df_local_all = df_local.rename(rename_mapping).with_columns(
+            pl.lit("Local").alias("source_type")
+        )
+
         source_df = pl.concat([df_import_all, df_local_all])
         pie_source_df = source_df
 
         # Extract unique 2-digit HTS prefixes sorted alphabetically/numerically for the dropdown selector
         unique_prefixes = sorted(
             list(
-                source_df.select(
-                    pl.col("hts_code").cast(pl.String).str.slice(0, 2)
-                )
+                source_df.select(pl.col("hts_code").cast(pl.String).str.slice(0, 2))
                 .unique()
                 .to_series()
             )
         )
-        
+
         if not unique_prefixes:
             unique_prefixes = ["00"]
 
@@ -856,14 +851,13 @@ class DataCal(JPTrade):
 
         # Dropdown selection widget for the first 2 digits of HTS code
         hts_dropdown = alt.binding_select(
-            options=unique_prefixes, 
-            name="HTS Chapter (First 2 Digits): "
+            options=unique_prefixes, name="HTS Chapter (First 2 Digits): "
         )
         select_chapter = alt.selection_point(
-            name="hts_chapter", 
-            fields=["hts_prefix"], 
-            bind=hts_dropdown, 
-            value=[{"hts_prefix": unique_prefixes[0]}]
+            name="hts_chapter",
+            fields=["hts_prefix"],
+            bind=hts_dropdown,
+            value=[{"hts_prefix": unique_prefixes[0]}],
         )
 
         # 6. Define a cohesive, professional color palette
@@ -884,7 +878,7 @@ class DataCal(JPTrade):
                 key="source_type",
                 keyvals=["Import", "Local"],
                 value=0,
-                groupby=["hts_code", "fiscal_year"]
+                groupby=["hts_code", "fiscal_year"],
             )
             .transform_calculate(
                 is_local_cal=alt.expr.if_(
@@ -904,7 +898,7 @@ class DataCal(JPTrade):
                 pct=alt.expr.if_(
                     alt.datum.hts_total > 0,
                     alt.datum.source_hts_total / alt.datum.hts_total,
-                    0
+                    0,
                 )
             )
         )
@@ -922,24 +916,24 @@ class DataCal(JPTrade):
             .transform_filter(select_year)
             .transform_aggregate(
                 source_total_calories="sum(total_calories)",
-                groupby=["fiscal_year", "source_type"]
+                groupby=["fiscal_year", "source_type"],
             )
             .transform_impute(
                 "source_total_calories",
                 key="source_type",
                 keyvals=["Import", "Local"],
                 value=0,
-                groupby=["fiscal_year"]
+                groupby=["fiscal_year"],
             )
             .transform_joinaggregate(
                 grand_total_calories="sum(source_total_calories)",
-                groupby=["fiscal_year"]
+                groupby=["fiscal_year"],
             )
             .transform_calculate(
                 pie_pct=alt.expr.if_(
                     alt.datum.grand_total_calories > 0,
                     alt.datum.source_total_calories / alt.datum.grand_total_calories,
-                    0
+                    0,
                 )
             )
             .encode(
@@ -956,7 +950,7 @@ class DataCal(JPTrade):
                 alt.Tooltip(
                     "source_total_calories:Q", title="Total Calories", format="~s"
                 ),
-                alt.Tooltip("pie_pct:Q", title="Market Share", format=".1%")
+                alt.Tooltip("pie_pct:Q", title="Market Share", format=".1%"),
             ]
         )
 
@@ -1021,7 +1015,7 @@ class DataCal(JPTrade):
                 fontSize=13,
                 color="#333333",
             ),
-            height=400
+            height=400,
         )
 
         # Middle Chart: Centralized HTS Code Text Labels
@@ -1035,12 +1029,9 @@ class DataCal(JPTrade):
                 text=alt.Text("hts_code:O"),
             )
             .mark_text(font="Arial", fontSize=11, color="#555555")
-            .properties(
-                width=60, 
-                height=scrollable_height
-            )
+            .properties(width=60, height=scrollable_height)
         )
-        
+
         middle_container = alt.layer(middle).properties(height=400)
 
         # Right Chart: Local data
@@ -1078,7 +1069,7 @@ class DataCal(JPTrade):
                 fontSize=13,
                 color="#333333",
             ),
-            height=400
+            height=400,
         )
 
         bottom_row = alt.hconcat(left, middle_container, right, spacing=10)
