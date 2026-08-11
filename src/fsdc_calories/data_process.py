@@ -408,10 +408,11 @@ class DataCal(JPTrade):
         elif source == "local":
             data = self.gen_nuti_data_local()
         elif source == "both":
-            df_imports = self.gen_nuti_data(time_frame="fiscal")
+            df_imports = self.gen_nuti_data(time_frame="fiscal").drop("net_qty")
             df_local = self.gen_nuti_data_local()
+            df_local = df_local.filter(pl.col("fiscal_year") > 2009)
             data = df_imports.vstack(df_local)
-            data = data.filter(pl.col("fiscal_year") > 2009)
+
         else:
             raise ValueError(
                 f"Invalid source '{source}'. Expected 'imported', 'local', or 'both'."
@@ -493,6 +494,9 @@ class DataCal(JPTrade):
             .add_params(hover_select)
         )
 
+        # Format source string nicely for the title (e.g., 'Imported', 'Local', or 'Combined')
+        source_label = "Combined" if source == "both" else source.capitalize()
+
         # Dynamic subtitles based on selection
         subtitle_map = {
             "imported": "Showing imported nutritional intake data.",
@@ -500,16 +504,14 @@ class DataCal(JPTrade):
             "both": "Showing combined imported + local nutritional intake data.",
         }
 
-        # Map column keys to clean human-readable titles for each choice
-        title_lookup = alt.expr.if_(
-            *[alt.expr.uvg.strContains(ycol_param.name, k), f"'{v}'"] 
+        # Constructing a clean conditional Vega expression including the source label:
+        expr_parts = [
+            f"selected_metric == '{k}' ? '{source_label} {v} by Fiscal Year'"
             for k, v in column_label_map.items()
+        ]
+        dynamic_title_expr = (
+            " : ".join(expr_parts) + f" : '{source_label} Nutritional Intake by Fiscal Year'"
         )
-        
-        # Alternatively, build a nested expression string for Vega title binding:
-        # Constructing a clean conditional Vega expression for the title string:
-        expr_parts = [f"selected_metric == '{k}' ? '{v} Intake by Fiscal Year'" for k, v in column_label_map.items()]
-        dynamic_title_expr = " : ".join(expr_parts) + " : 'Nutritional Intake by Fiscal Year'"
 
         # Combine layers & apply styling with dynamic title expression
         final_chart = (
@@ -799,7 +801,7 @@ class DataCal(JPTrade):
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
         # 1. Load dataframes
         df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2009)
-        df_import = self.gen_nuti_data()
+        df_import = self.gen_nuti_data().drop("net_qty")
 
         # A robust renaming map that strips out _g, _mg, _iu before adding _kg
         rename_mapping = {}
