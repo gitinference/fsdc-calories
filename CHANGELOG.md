@@ -1,3 +1,8 @@
+## [0.14.1] - 2026-08-12
+
+### 🚜 Refactor
+
+- *(data_process.py)* Improve data processing and visualization functions for better performance and readability
 ## [0.13.0] - 2026-07-27
 
 ### 🚀 Features
