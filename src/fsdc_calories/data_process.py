@@ -46,6 +46,7 @@ class DataCal(JPTrade):
 
         # 2. Pull trade data using the dynamic timeframe
         df = self.process_int_jp(time_frame=time_frame, level="hts", source="org")
+        df = df.with_columns(net_qty=pl.col("net_qty") * - 1)
         df = df.with_columns(
             net_qty=pl.when(pl.col("net_qty") < 0)
             .then(pl.lit(0))
@@ -510,7 +511,8 @@ class DataCal(JPTrade):
             for k, v in column_label_map.items()
         ]
         dynamic_title_expr = (
-            " : ".join(expr_parts) + f" : '{source_label} Nutritional Intake by Fiscal Year'"
+            " : ".join(expr_parts)
+            + f" : '{source_label} Nutritional Intake by Fiscal Year'"
         )
 
         # Combine layers & apply styling with dynamic title expression
@@ -644,7 +646,7 @@ class DataCal(JPTrade):
 
     def gen_graphs_plate(self) -> alt.Chart:
         """
-        Generates a production-grade, interactive donut chart showing the
+        Generates a production-grade, interactive pie chart showing the
         yearly food category distribution.
 
         Returns:
@@ -654,7 +656,9 @@ class DataCal(JPTrade):
         # 1. Data Ingestion & Validation
         # ---------------------------------------------------------
         try:
-            hts_data = self.process_int_jp(time_frame="monthly", level="hts", source="org")
+            hts_data = self.process_int_jp(
+                time_frame="monthly", level="hts", source="org"
+            )
         except Exception as e:
             logger.error(f"Failed to process internal JP data: {e}")
             return alt.Chart()
@@ -772,7 +776,7 @@ class DataCal(JPTrade):
         )
 
         chart_arc = base.mark_arc(
-            innerRadius=60, outerRadius=110, stroke="#fff", strokeWidth=2
+            innerRadius=0, outerRadius=110, stroke="#fff", strokeWidth=2
         )
 
         chart_text = base.mark_text(
