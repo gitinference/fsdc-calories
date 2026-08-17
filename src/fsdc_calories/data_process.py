@@ -45,12 +45,11 @@ class DataCal(JPTrade):
         nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
 
         # 2. Pull trade data using the dynamic timeframe
-        df = self.process_int_jp(time_frame=time_frame, level="hts", source="org")
-        df = df.with_columns(net_qty=pl.col("net_qty") * - 1)
+        df = self.process_int_jp(time_frame=time_frame, level="hts", source="org", corrections=True)
         df = df.with_columns(
-            net_qty=pl.when(pl.col("net_qty") < 0)
+            net_qty=pl.when(pl.col("net_imports_qty") < 0)
             .then(pl.lit(0))
-            .otherwise(pl.col("net_qty"))
+            .otherwise(pl.col("net_imports_qty"))
         )
 
         # 3. Match HTS lengths (slicing down to 4 digits to match nutri matrix)
@@ -90,7 +89,7 @@ class DataCal(JPTrade):
 
         # Update target metric keys for downstream pipeline steps
         total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols] + [
-            "net_qty"
+            "net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other"
         ]
 
         time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
@@ -172,7 +171,7 @@ class DataCal(JPTrade):
         return df_local
 
     def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        df: pd.DataFrame = self.process_price(agriculture_filter=False).to_pandas()
+        df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
 
         import_pct_col = "pct_change_imports_year_over_year"
         export_pct_col = "pct_change_exports_year_over_year"
@@ -409,10 +408,10 @@ class DataCal(JPTrade):
         elif source == "local":
             data = self.gen_nuti_data_local()
         elif source == "both":
-            df_imports = self.gen_nuti_data(time_frame="fiscal").drop("net_qty")
+            df_imports = self.gen_nuti_data(time_frame="fiscal").drop("net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other")
             df_local = self.gen_nuti_data_local()
-            df_local = df_local.filter(pl.col("fiscal_year") > 2009)
-            data = df_imports.vstack(df_local)
+            df_local = df_local.filter(pl.col("fiscal_year") > 2002)
+            data = pl.concat([df_imports, df_local], how="diagonal")
 
         else:
             raise ValueError(
@@ -709,12 +708,7 @@ class DataCal(JPTrade):
             )
             .join(lookup_map, on="schedule_b", how="left")
             .with_columns(pl.col("category").fill_null("other"))
-            .with_columns(
-                pl.when(pl.col("category") == "ice_cream")
-                .then(pl.lit("other"))
-                .otherwise(pl.col("category"))
-            )
-            .filter(pl.col("category") != "other")
+            #.filter(pl.col("category") != "other")
             .group_by(["year", "category"])
             .agg(pl.len().alias("value"))
             .with_columns(
@@ -804,7 +798,7 @@ class DataCal(JPTrade):
 
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
         # 1. Load dataframes
-        df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2009)
+        df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2002)
         df_import = self.gen_nuti_data().drop("net_qty")
 
         # A robust renaming map that strips out _g, _mg, _iu before adding _kg
