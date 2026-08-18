@@ -545,15 +545,10 @@ class DataCal(JPTrade):
         # 1. Fetch ranking data
         imports_df, exports_df = self.gen_price_rankings()
 
-        # 2. Query commodity descriptions from DuckDB safely
-        query = f"""
-            SELECT DISTINCT 
-                SUBSTRING(hts_code, 1, 4) AS hs4,
-                SUBSTRING(hts_desc, 1, 30) AS hts_desc
-            FROM '{self.saving_dir}/raw/jp_data.parquet'
-        """
-        desc_df = self.conn.execute(query).df()
-        desc_df = desc_df.drop_duplicates(subset=["hs4"])
+        path_data = str(resources.files("fsdc_calories").joinpath("data/hts4_walk.parquet"))
+
+        desc_df = pl.read_parquet(path_data).rename({"code_4":"hs4", "Description":"hts_desc"}).to_pandas()
+        desc_df = desc_df.rename({"code_4":"hs4"})
 
         def process_and_build_chart(df: pd.DataFrame, title_text: str) -> alt.Chart:
             """Helper to deduplicate top/bottom records, join descriptions, and build chart."""
@@ -561,8 +556,8 @@ class DataCal(JPTrade):
                 return alt.Chart(pd.DataFrame()).mark_text(text=f"No {title_text} Data")
 
             # Select Top 10 and Bottom 10 without duplicate overlap if total rows < 20
-            top = df.head(10)
-            bottom = df.tail(10)
+            top = df.head(50)
+            bottom = df.tail(50)
             combined = pd.concat([top, bottom], ignore_index=True).drop_duplicates()
 
             # Join descriptions on 'hs4'
