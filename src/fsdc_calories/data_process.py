@@ -3,6 +3,8 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Literal
+import plotly.graph_objects as go
+import plotly.express as px
 
 import altair as alt
 import numpy as np
@@ -42,10 +44,14 @@ class DataCal(JPTrade):
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
-        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
+        nutri_df = nutri_df.with_columns(
+            calories=pl.col("calories") * 10
+        )  # add due to original matrix in Kcal per 100gm
 
         # 2. Pull trade data using the dynamic timeframe
-        df = self.process_int_jp(time_frame=time_frame, level="hts", source="org", corrections=True)
+        df = self.process_int_jp(
+            time_frame=time_frame, level="hts", source="org", corrections=True
+        )
         df = df.with_columns(
             net_qty=pl.when(pl.col("net_imports_qty") < 0)
             .then(pl.lit(0))
@@ -89,8 +95,29 @@ class DataCal(JPTrade):
 
         # Update target metric keys for downstream pipeline steps
         total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols] + [
-            "net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other"
+            "net_qty",
+            "protein",
+            "vegetable",
+            "dairy",
+            "fruits",
+            "grains",
+            "ice_cream",
+            "fats",
+            "sugars",
+            "other",
         ]
+
+        df =  df.with_columns(
+            protein=pl.col("total_calories") * pl.col("protein"),
+            vegetable=pl.col("total_calories") * pl.col("protein"),
+            dairy=pl.col("total_calories") * pl.col("dairy"),
+            fruits=pl.col("total_calories") * pl.col("fruits"),
+            grains=pl.col("total_calories") * pl.col("grains"),
+            ice_cream=pl.col("total_calories") * pl.col("ice_cream"),
+            fats=pl.col("total_calories") * pl.col("fats"),
+            sugars=pl.col("total_calories") * pl.col("sugars"),
+            other=pl.col("total_calories") * pl.col("other"),
+        )
 
         time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
         group_keys = time_cols + ["hts_code"]
@@ -125,7 +152,9 @@ class DataCal(JPTrade):
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
-        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
+        nutri_df = nutri_df.with_columns(
+            calories=pl.col("calories") * 10
+        )  # add due to original matrix in Kcal per 100gm
 
         df_local = df_local.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
         df_local = df_local.join(nutri_df, on="hts_code", how="inner", validate="m:1")
@@ -396,7 +425,7 @@ class DataCal(JPTrade):
             "total_carbohydrate_kg": "Carbohydrates (kg)",
             "total_fiber_kg": "Fibers (kg)",
             "total_sugar_kg": "Sugars (kg)",
-            "total_vitamin_d_kg": "Vitamin D (kg)",
+            "total_vimport plotly.graph_objects as goitamin_d_kg": "Vitamin D (kg)",
             "total_calcium_kg": "Calcium (kg)",
             "total_potassium_kg": "Potassium (kg)",
             "total_iron_kg": "Iron (kg)",
@@ -408,7 +437,18 @@ class DataCal(JPTrade):
         elif source == "local":
             data = self.gen_nuti_data_local()
         elif source == "both":
-            df_imports = self.gen_nuti_data(time_frame="fiscal").drop("net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other")
+            df_imports = self.gen_nuti_data(time_frame="fiscal").drop(
+                "net_qty",
+                "protein",
+                "vegetable",
+                "dairy",
+                "fruits",
+                "grains",
+                "ice_cream",
+                "fats",
+                "sugars",
+                "other",
+            )
             df_local = self.gen_nuti_data_local()
             df_local = df_local.filter(pl.col("fiscal_year") > 2002)
             data = pl.concat([df_imports, df_local], how="diagonal")
@@ -638,158 +678,129 @@ class DataCal(JPTrade):
 
         return final_chart
 
-    def gen_graphs_plate(self) -> alt.Chart:
-        """
-        Generates a production-grade, interactive pie chart showing the
-        yearly food category distribution.
-
-        Returns:
-            alt.Chart: An interactive Altair chart configuration.
-        """
-        # ---------------------------------------------------------
-        # 1. Data Ingestion & Validation
-        # ---------------------------------------------------------
-        try:
-            hts_data = self.process_int_jp(
-                time_frame="monthly", level="hts", source="org"
-            )
-        except Exception as e:
-            logger.error(f"Failed to process internal JP data: {e}")
-            return alt.Chart()
-
-        parquet_path = Path("data/external/schedule_b_reference")
-        if not parquet_path.exists():
-            logger.error(f"Reference file not found at path: {parquet_path}")
-            return alt.Chart()
-
-        ref_df = pl.read_parquet(parquet_path)
-
-        # ---------------------------------------------------------
-        # 2. Extract Categories & Build Lookup Map
-        # ---------------------------------------------------------
-        available_cats = [
-            c for c in Constants.get_food_categories() if c in ref_df.columns
-        ]
-
-        if not available_cats:
-            logger.warning("No food categories found matching the reference schema.")
-            return alt.Chart()
-
-        category_expr = pl.coalesce(
-            [
-                pl.when(pl.col(c).cast(pl.String) == "1").then(pl.lit(c))
-                for c in available_cats
-            ]
-        ).fill_null("other")
-
-        lookup_map = (
-            ref_df.with_columns(
-                pl.col("schedule_b").cast(pl.String).str.pad_end(10, "0")
-            )
-            .select(["schedule_b", category_expr.alias("category")])
-            .drop_nulls()
+    def gen_graphs_plate(self):
+        df = self.gen_nuti_data()
+        df = df.group_by(["fiscal_year"]).agg(pl.col("total_calories", "protein", "vegetable", "dairy", "fruits", "grains", "ice_cream", "fats", "sugars", "other").sum())
+        df =  df.with_columns(
+            protein=pl.col("protein")/ pl.col("total_calories"),
+            vegetable=pl.col("protein")/ pl.col("total_calories"),
+            dairy=pl.col("dairy")/ pl.col("total_calories"),
+            fruits=pl.col("fruits")/ pl.col("total_calories"),
+            grains=pl.col("grains")/ pl.col("total_calories"),
+            ice_cream=pl.col("ice_cream")/ pl.col("total_calories"),
+            fats=pl.col("fats")/ pl.col("total_calories"),
+            sugars=pl.col("sugars")/ pl.col("total_calories"),
+            other=pl.col("other")/ pl.col("total_calories"),
         )
 
-        # ---------------------------------------------------------
-        # 3. Join, Aggregate, and Compute Percentages
-        # ---------------------------------------------------------
-        processed_data = (
-            hts_data.with_columns(
-                pl.col("hts_code")
-                .cast(pl.String)
-                .str.slice(0, 4)
-                .str.pad_end(10, "0")
-                .alias("schedule_b")
+        df = df.with_columns(
+            others=pl.col("other") + pl.col("ice_cream") + pl.col("fats") + pl.col("sugars")
+        ).drop("ice_cream", "fats", "sugars")
+
+        # Convert Polars DataFrame to Pandas for Plotly processing
+        pdf = df.to_pandas()
+            
+        # Define categories to plot and clean them up for presentation (Title Case)
+        categories = ["protein", "vegetable", "dairy", "fruits", "grains", "other"]
+        category_labels = [cat.capitalize() for cat in categories]
+
+        # Sort the fiscal years in descending order (inverted sort)
+        fiscal_years = sorted(pdf["fiscal_year"].unique().tolist(), reverse=True)
+
+        # Generate a professional, color-blind friendly Viridis color palette mapped to categories
+        viridis_colors = px.colors.sample_colorscale("Viridis", len(categories))
+
+        fig = go.Figure()
+
+        # Add traces for each fiscal year
+        for i, year in enumerate(fiscal_years):
+            row = pdf[pdf["fiscal_year"] == year]
+            values = [row[cat].values[0] for cat in categories]
+            
+            fig.add_trace(
+                go.Pie(
+                    labels=category_labels,
+                    values=values,
+                    name=str(year),
+                    visible=(i == 0),  # Show only the first year by default
+                    textinfo="label+percent",
+                    hoverinfo="label+percent+value",
+                    hovertemplate="<b>%{label}</b><br>Share: %{percent}<extra></extra>",
+                    marker=dict(
+                        colors=viridis_colors,
+                        line=dict(color="#FFFFFF", width=2)  # Crisp separation borders
+                    ),
+                    # Pull out the largest slice slightly for a modern aesthetic focal point
+                    pull=[0.03 if j == values.index(max(values)) else 0 for j in range(len(values))]
+                )
             )
-            .join(lookup_map, on="schedule_b", how="left")
-            .with_columns(pl.col("category").fill_null("other"))
-            #.filter(pl.col("category") != "other")
-            .group_by(["year", "category"])
-            .agg(pl.len().alias("value"))
-            .with_columns(
-                (pl.col("value") / pl.col("value").sum().over("year") * 100)
-                .round(1)
-                .alias("pct")
+            
+        # Create robust dropdown buttons
+        buttons = []
+        for i, year in enumerate(fiscal_years):
+            visibility = [False] * len(fiscal_years)
+            visibility[i] = True
+            
+            buttons.append(
+                dict(
+                    label=str(year),
+                    method="restyle",  # Use 'restyle' instead of 'update' for targeted trace visibility switching
+                    args=[
+                        {"visible": visibility},
+                        {"title.text": f"<b>Nutritional Proportion Breakdown — Fiscal Year {year}</b>"}
+                    ]
+                )
             )
-            .with_columns(
-                (pl.col("pct").cast(pl.String) + "%").alias("pct_text"),
-                pl.col("category").str.to_titlecase().alias("category_clean"),
+            
+        # Update layout to publication-ready standards
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    active=0,
+                    buttons=buttons,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.15,
+                    yanchor="top",
+                    bgcolor="#F8F9FA",
+                    bordercolor="#CED4DA",
+                    borderwidth=1,
+                    pad={"r": 10, "t": 10, "b": 10, "l": 10},
+                    font=dict(family="Arial, sans-serif", size=12, color="#212529")
+                )
+            ],
+            title=dict(
+                text=f"<b>Puerto Rico Food Pate Proportion Breakdown — Fiscal Year {fiscal_years[0]}</b><br><sup>Comparative annual distribution across major food groups from imported data</sup>",
+                font=dict(family="Arial, sans-serif", size=16, color="#212529"),
+                x=0.0,  # Left-align title for a modern corporate/editorial look
+                xanchor="left",
+                y=0.95
+            ),
+            template="simple_white",
+            font=dict(family="Arial, sans-serif", size=12, color="#212529"),
+            legend=dict(
+                title=dict(text="<b>Food Categories</b>"),
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="#E9ECEF",
+                borderwidth=1
+            ),
+            margin=dict(t=140, b=50, l=50, r=150),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=12,
+                font_family="Arial, sans-serif"
             )
         )
 
-        # ---------------------------------------------------------
-        # 4. Interactive Parameters Setup
-        # ---------------------------------------------------------
-        valid_years = (
-            processed_data.select("year")
-            .unique()
-            .sort("year", descending=True)["year"]
-            .to_list()
-        )
+        # Enable responsive resizing configuration for web/dashboard embedding
+        #fig.show(config={"responsive": True, "displayModeBar": True})
+        return fig
 
-        if not valid_years:
-            logger.warning("Processed dataset yielded zero usable records.")
-            return alt.Chart()
-
-        max_year = valid_years[0]
-        default_year = valid_years[1] if len(valid_years) > 1 else max_year
-
-        year_dropdown = alt.binding_select(options=valid_years, name="Select Year: ")
-        year_select = alt.selection_point(
-            fields=["year"], bind=year_dropdown, value=default_year
-        )
-
-        chart_df = processed_data.to_pandas()
-
-        # ---------------------------------------------------------
-        # 5. Professional Visualization Assembly
-        # ---------------------------------------------------------
-        base = (
-            alt.Chart(chart_df)
-            .encode(
-                theta=alt.Theta("pct:Q").stack(True),
-                color=alt.Color(
-                    "category_clean:N",
-                    scale=alt.Scale(scheme="tableau10"),
-                    legend=alt.Legend(title="Food Category", orient="right"),
-                ),
-                tooltip=[
-                    alt.Tooltip("category_clean:N", title="Category"),
-                    alt.Tooltip("year:O", title="Year"),
-                    alt.Tooltip("value:Q", title="Count", format=","),
-                    alt.Tooltip("pct_text:N", title="Share"),
-                ],
-            )
-            .add_params(year_select)
-            .transform_filter(year_select)
-        )
-
-        chart_arc = base.mark_arc(
-            innerRadius=0, outerRadius=110, stroke="#fff", strokeWidth=2
-        )
-
-        chart_text = base.mark_text(
-            radius=130, size=11, font="Sans-Serif", fontWeight="bold"
-        ).encode(text="pct_text:N")
-
-        return (
-            (chart_arc + chart_text)
-            .properties(
-                title=alt.TitleParams(
-                    text="Yearly Food Category Distribution",
-                    subtitle=[
-                        "Structural macro-nutrient trends (Excluding 'Other' classifications)"
-                    ],
-                    fontSize=16,
-                    subtitleFontSize=12,
-                    anchor="start",
-                    color="#2c3e50",
-                ),
-                width=400,
-                height=350,
-            )
-            .configure_view(strokeWidth=0)
-        )
 
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
         # 1. Load dataframes

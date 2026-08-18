@@ -1091,6 +1091,7 @@ narwhals==2.24.0 \
     --hash=sha256:b5c0f684ccd9d7475b564111e319a4964abcf2baf79d3cf6b1003d06ac9b828d
     # via
     #   altair
+    #   plotly
     #   vegafusion
 nbclient==0.11.0 \
     --hash=sha256:04a134a5b087f2c5887f228aca155db50169b8cd9334dee6942c8e927e56081a \
@@ -1266,6 +1267,7 @@ packaging==26.3 \
     #   kaleido
     #   matplotlib
     #   nbconvert
+    #   plotly
     #   vegafusion
 pandas==3.0.5 \
     --hash=sha256:0d298e951f23016ce4699951d044ae6418dbc91bf68cefca0f77666fcbb4e5c6 \
@@ -1398,6 +1400,10 @@ platformdirs==4.11.3 \
     #   choreographer
     #   jupyter-core
     #   virtualenv
+plotly==6.9.0 \
+    --hash=sha256:36bebe2f1bb13884774fe61689c329071446f6ce4a8927fb1f0d6fb24f581236 \
+    --hash=sha256:967ad33e8c704fed051800d11d985eb206a9c795c14206b30a6f463ed9c67d0d
+    # via fsdc-calories
 pnglatex==1.1 \
     --hash=sha256:0995060d4926b6d3b40731586c615234c3e45b3142fc15b836601e3b0cf863d3 \
     --hash=sha256:8d1d01c59e14ad05ef152194c1bd28f996f0d999b93a67110f24e8be7c0aee20
