@@ -548,12 +548,13 @@ class DataCal(JPTrade):
         return fig
 
     def gen_graphs_price_change(self) -> go.Figure:
-        """Generates a side-by-side bar chart showing the largest price changes
+        """Generates a bar chart showing the largest price changes
 
-        (top 10 increases & bottom 10 decreases) for both Imports and Exports.
+        (top 30 increases & bottom 50 decreases) for Imports,
+        with dropdowns for Top/Bottom categories and the last 4 quarters.
 
         Returns:
-            alt.HConcatChart: Horizontally concatenated Altair chart.
+            go.Figure: Plotly figure with multi-dropdown support.
         """
         df = self.process_price(agriculture_filter=True)
         path_data = str(
@@ -563,63 +564,12 @@ class DataCal(JPTrade):
         desc_df = pl.read_parquet(path_data).rename(
             {"code_4": "hs4", "Description": "hts_desc"}
         )
-        desc_df.with_columns(pl.col("hs4") == "1516")
-
         df = df.join(desc_df, on="hs4", how="inner", validate="m:1")
 
-        # 1. Filter for the latest date & prepare columns (with word-based truncation)
-        latest_data = (
-            df.filter(pl.col("date") == pl.col("date").max())
-            .with_columns(
-                actual_yoy=pl.col("price_imports_yoy"),
-                plot_yoy=pl.col("price_imports_yoy").clip(-100, 100),
-                # Format the text label (+15.2% or -5.4%)
-                text_label=(
-                    pl.col("price_imports_yoy").round(1).cast(pl.Utf8) + "%"
-                ).str.replace(r"^([0-9])", r"+$1"),
-                # Split by whitespace, take first 4 words, join back, and append "..." if longer
-                short_desc=(
-                    pl.col("hts_desc").str.split(" ").list.head(4).list.join(" ")
-                    + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 4)
-                    .then(pl.lit("..."))
-                    .otherwise(pl.lit(""))
-                ),
-            )
-            .with_columns(
-                # Check for duplicates of short_desc and append a differentiator (e.g., " (2)", " (3)")
-                short_desc=pl.when(
-                    pl.col("short_desc").is_duplicated().over("short_desc")
-                )
-                .then(
-                    pl.col("short_desc")
-                    + " ("
-                    + (pl.cum_count("short_desc").over("short_desc").cast(pl.Utf8))
-                    + ")"
-                )
-                .otherwise(pl.col("short_desc"))
-            )
-        )
+        # 1. Get the last 4 unique dates (quarters) sorted chronologically
+        all_dates = df.select("date").unique().sort("date")["date"].to_list()
+        last_4_dates = all_dates[-4:] if len(all_dates) >= 4 else all_dates
 
-        # 2. Extract Top 50 and Bottom 50
-        # Top 50: Sort ascending so the largest positive value is last (at the top of the chart)
-        top_50_data = (
-            latest_data.sort("actual_yoy", descending=True)
-            .head(30)
-            .to_pandas()
-            .iloc[::-1]
-        )
-
-        # Bottom 50: We want the biggest drop (most negative) at the top.
-        # Sorting ascending with .head(50) gives the most negative values first,
-        # so we reverse it (.iloc[::-1]) so the absolute largest drop lands at the very top.
-        bottom_50_data = (
-            latest_data.sort("actual_yoy", descending=False)
-            .head(50)
-            .to_pandas()
-            .iloc[::-1]
-        )
-
-        # 3. Create a single figure (no subplots needed)
         fig = go.Figure()
 
         # Enhanced hover template
@@ -630,94 +580,195 @@ class DataCal(JPTrade):
             "<extra></extra>"
         )
 
-        # 4. Add Top 50 Trace (Index 0 - Shown by default)
-        fig.add_trace(
-            go.Bar(
-                x=top_50_data["plot_yoy"],
-                y=top_50_data["short_desc"],
-                text=top_50_data["text_label"],
-                textposition="outside",
-                orientation="h",
-                customdata=list(zip(top_50_data["hs4"], top_50_data["actual_yoy"])),
-                hovertemplate=hover_template,
-                marker=dict(
-                    color=top_50_data["plot_yoy"],
-                    colorscale="Viridis",
-                    showscale=False,
-                    opacity=0.9,
-                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-                ),
-                visible=True,
-            )
-        )
+        # We will store trace visibility configurations and date mapping
+        # Structure: We have 4 dates, and for each date we have a Top trace and a Bottom trace.
+        # Total traces = 4 dates * 2 (Top/Bottom) = 8 traces.
+        trace_counter = 0
+        date_trace_indices = {} # Maps date -> {"top": idx, "bottom": idx}
 
-        # 5. Add Bottom 50 Trace (Index 1 - Hidden by default)
-        fig.add_trace(
-            go.Bar(
-                x=bottom_50_data["plot_yoy"],
-                y=bottom_50_data["short_desc"],
-                text=bottom_50_data["text_label"],
-                textposition="outside",
-                orientation="h",
-                customdata=list(
-                    zip(bottom_50_data["hs4"], bottom_50_data["actual_yoy"])
-                ),
-                hovertemplate=hover_template,
-                marker=dict(
-                    color=bottom_50_data["plot_yoy"],
-                    colorscale="Viridis_r",
-                    showscale=False,
-                    opacity=0.9,
-                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
-                ),
-                visible=False,
+        for d_idx, target_date in enumerate(last_4_dates):
+            # Filter data for the specific quarter
+            quarter_data = (
+                df.filter(pl.col("date") == target_date)
+                .with_columns(
+                    actual_yoy=pl.col("price_imports_yoy"),
+                    plot_yoy=pl.col("price_imports_yoy").clip(-100, 100),
+                    text_label=(
+                        pl.col("price_imports_yoy").round(1).cast(pl.Utf8) + "%"
+                    ).str.replace(r"^([0-9])", r"+$1"),
+                    short_desc=(
+                        pl.col("hts_desc").str.split(" ").list.head(4).list.join(" ")
+                        + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 4)
+                        .then(pl.lit("..."))
+                        .otherwise(pl.lit(""))
+                    ),
+                )
+                .with_columns(
+                    short_desc=pl.when(
+                        pl.col("short_desc").is_duplicated().over("short_desc")
+                    )
+                    .then(
+                        pl.col("short_desc")
+                        + " ("
+                        + (pl.cum_count("short_desc").over("short_desc").cast(pl.Utf8))
+                        + ")"
+                    )
+                    .otherwise(pl.col("short_desc"))
+                )
             )
-        )
 
-        # 6. Configure Tab-Style Buttons (Updatemenus)
+            # Top data (Top 30)
+            top_data = (
+                quarter_data.sort("actual_yoy", descending=True)
+                .head(30)
+                .to_pandas()
+                .iloc[::-1]
+            )
+
+            # Bottom data (Bottom 50)
+            bottom_data = (
+                quarter_data.sort("actual_yoy", descending=False)
+                .head(50)
+                .to_pandas()
+                .iloc[::-1]
+            )
+
+            # Add Top Trace
+            fig.add_trace(
+                go.Bar(
+                    x=top_data["plot_yoy"],
+                    y=top_data["short_desc"],
+                    text=top_data["text_label"],
+                    textposition="outside",
+                    orientation="h",
+                    customdata=list(zip(top_data["hs4"], top_data["actual_yoy"])),
+                    hovertemplate=hover_template,
+                    marker=dict(
+                        color=top_data["plot_yoy"],
+                        colorscale="Viridis",
+                        showscale=False,
+                        opacity=0.9,
+                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                    ),
+                    visible=(d_idx == len(last_4_dates) - 1), # Default visible is the latest date's top trace
+                )
+            )
+            top_idx = trace_counter
+            trace_counter += 1
+
+            # Add Bottom Trace
+            fig.add_trace(
+                go.Bar(
+                    x=bottom_data["plot_yoy"],
+                    y=bottom_data["short_desc"],
+                    text=bottom_data["text_label"],
+                    textposition="outside",
+                    orientation="h",
+                    customdata=list(
+                        zip(bottom_data["hs4"], bottom_data["actual_yoy"])
+                    ),
+                    hovertemplate=hover_template,
+                    marker=dict(
+                        color=bottom_data["plot_yoy"],
+                        colorscale="Viridis_r",
+                        showscale=False,
+                        opacity=0.9,
+                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                    ),
+                    visible=False,
+                )
+            )
+            bottom_idx = trace_counter
+            trace_counter += 1
+
+            date_trace_indices[target_date] = {"top": top_idx, "bottom": bottom_idx}
+
+        # 3. Build Dropdown Menus
+        total_traces = trace_counter
+
+        top_btn_visibility = [False] * total_traces
+        bottom_btn_visibility = [False] * total_traces
+        
+        # By default, activate the latest quarter's top and bottom indices
+        latest_date = last_4_dates[-1]
+        top_btn_visibility[date_trace_indices[latest_date]["top"]] = True
+        bottom_btn_visibility[date_trace_indices[latest_date]["bottom"]] = True
+
+        metric_buttons = [
+            dict(
+                label="Top 30 Categories (YoY % Increase)",
+                method="update",
+                args=[
+                    {"visible": top_btn_visibility},
+                    {"xaxis.range": [0, 120], "xaxis.title_text": "YoY % Change"},
+                ],
+            ),
+            dict(
+                label="Bottom 50 Categories (YoY % Decrease)",
+                method="update",
+                args=[
+                    {"visible": bottom_btn_visibility},
+                    {"xaxis.range": [-120, 0], "xaxis.title_text": "YoY % Change"},
+                ],
+            ),
+        ]
+
+        quarter_buttons = []
+        for target_date in last_4_dates:
+            date_str = str(target_date)
+            
+            q_top_vis = [False] * total_traces
+            q_bot_vis = [False] * total_traces
+            
+            q_top_vis[date_trace_indices[target_date]["top"]] = True
+            q_bot_vis[date_trace_indices[target_date]["bottom"]] = True
+
+            quarter_buttons.append(
+                dict(
+                    label=f"Quarter: {date_str}",
+                    method="update",
+                    args=[
+                        {"visible": q_top_vis}, 
+                        {"xaxis.range": [0, 120], "xaxis.title_text": "YoY % Change"},
+                    ],
+                )
+            )
+
+        # Configure Layout with fixed vertical spacing for dropdowns and title
         fig.update_layout(
             updatemenus=[
+                # Dropdown 1: Metric Selection (Top / Bottom) - Pushed higher up
                 dict(
-                    type="buttons",
-                    direction="right",
-                    active=0,
-                    x=0.5,
+                    type="dropdown",
+                    direction="down",
+                    x=0.25,
                     xanchor="center",
-                    y=1.12,
+                    y=1.30,  # Increased from 1.18
                     yanchor="top",
                     bgcolor="#F8F9F9",
                     bordercolor="#BDC3C7",
                     borderwidth=1,
-                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
-                    buttons=[
-                        dict(
-                            label="Top 50 Categories (YoY % Increase)",
-                            method="update",
-                            args=[
-                                {"visible": [True, False]},
-                                {
-                                    "xaxis.range": [0, 120],
-                                    "xaxis.title_text": "YoY % Change",
-                                },
-                            ],
-                        ),
-                        dict(
-                            label="Bottom 50 Categories (YoY % Decrease)",
-                            method="update",
-                            args=[
-                                {"visible": [False, True]},
-                                {
-                                    "xaxis.range": [-120, 0],
-                                    "xaxis.title_text": "YoY % Change",
-                                },
-                            ],
-                        ),
-                    ],
-                )
+                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    buttons=metric_buttons,
+                ),
+                # Dropdown 2: Quarter Selection (Last 4 Quarters) - Pushed higher up
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    x=0.75,
+                    xanchor="center",
+                    y=1.30,  # Increased from 1.18
+                    yanchor="top",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    buttons=quarter_buttons,
+                ),
             ],
             template="plotly_white",
             title=dict(
-                text="<b>Import Price Volatility: Extreme YoY Changes</b><br><sup>Switch between top positive and negative HS4 category movements</sup>",
+                text="<b>Import Price Volatility: Extreme YoY Changes</b><br><sup>Filter by category performance and quarter</sup>",
                 font=dict(size=18, family="Inter, sans-serif", color="#2C3E50"),
                 x=0.5,
                 xanchor="center",
@@ -726,12 +777,12 @@ class DataCal(JPTrade):
             ),
             font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
             height=1200,
-            margin=dict(l=120, r=100, t=160, b=80),
+            margin=dict(l=120, r=100, t=220, b=80),  # Increased top margin from 180 to 220
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
         )
 
-        # 7. Configure X and Y Axes
+        # 4. Configure X and Y Axes
         fig.update_xaxes(
             title_text="YoY % Change",
             range=[0, 120],
