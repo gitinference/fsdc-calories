@@ -107,7 +107,7 @@ class DataCal(JPTrade):
             "other",
         ]
 
-        df =  df.with_columns(
+        df = df.with_columns(
             protein=pl.col("total_calories") * pl.col("protein"),
             vegetable=pl.col("total_calories") * pl.col("protein"),
             dairy=pl.col("total_calories") * pl.col("dairy"),
@@ -408,8 +408,9 @@ class DataCal(JPTrade):
 
     def gen_graphs_nuti_data_fiscal(
         self, source: Literal["imported", "local", "both"] = "both"
-    ) -> alt.Chart:
-        """Generates an interactive line chart tracking nutritional metrics over fiscal years.
+    ) -> go.Figure:
+        """Generates an interactive Plotly line chart tracking nutritional metrics over fiscal years,
+        styled to match the template standard.
 
         :param source: Data source to display - 'imported', 'local', or 'both'
             (sum of imported + local).
@@ -452,127 +453,153 @@ class DataCal(JPTrade):
             df_local = self.gen_nuti_data_local()
             df_local = df_local.filter(pl.col("fiscal_year") > 2002)
             data = pl.concat([df_imports, df_local], how="diagonal")
-
         else:
             raise ValueError(
                 f"Invalid source '{source}'. Expected 'imported', 'local', or 'both'."
             )
 
         # Process and aggregate Polars DataFrame
-        data = (
+        df_pd = (
             data.group_by("fiscal_year")
             .agg([pl.col(c).sum() for c in column_label_map.keys()])
             .sort("fiscal_year")
             .to_pandas()
         )
 
-        if data.empty:
-            return alt.Chart(data).mark_text(text="No data available")
-
-        # Dropdown binding parameter for nutrients (Default updated to total_calories)
-        dropdown = alt.binding_select(
-            options=list(column_label_map.keys()),
-            labels=list(column_label_map.values()),
-            name="Nutrient: ",
-        )
-        ycol_param = alt.param(
-            name="selected_metric", value="total_calories", bind=dropdown
-        )
-
-        # Selection parameter for interactive hover tooltips
-        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
-
-        # Tooltips formatted for integer year and metric values
-        tooltip_config = [
-            alt.Tooltip("fiscal_year:Q", title="Fiscal Year", format="d"),
-            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
-        ]
-
-        # Base chart with calculated field
-        base = (
-            alt.Chart(data)
-            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
-            .add_params(ycol_param)
-        )
-
-        # Primary line chart
-        line = base.mark_line(
-            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
-        ).encode(
-            x=alt.X(
-                "fiscal_year:Q",
-                title="Fiscal Year",
-                axis=alt.Axis(grid=False, format="d", tickMinStep=1),
-            ),
-            y=alt.Y(
-                "selected_value:Q",
-                title=None,
-                axis=alt.Axis(
-                    gridDash=[2, 2],
-                    gridColor="#E0E0E0",
-                    labelExpr="replace(datum.label, 'G', 'B')",
-                    format="~s",
-                ),
-            ),
-        )
-
-        # Interactive hover points & tooltips
-        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
-            x="fiscal_year:Q",
-            y="selected_value:Q",
-            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
-            tooltip=tooltip_config,
-        )
-
-        # Transparent rule selector for hover snapping
-        selectors = (
-            base.mark_rule(strokeWidth=20, opacity=0)
-            .encode(
-                x="fiscal_year:Q",
-                tooltip=tooltip_config,
+        if df_pd.empty:
+            fig = go.Figure()
+            fig.update_layout(
+                title="No data available",
+                template="plotly_white",
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
             )
-            .add_params(hover_select)
-        )
+            return fig
 
-        # Format source string nicely for the title (e.g., 'Imported', 'Local', or 'Combined')
         source_label = "Combined" if source == "both" else source.capitalize()
-
-        # Dynamic subtitles based on selection
         subtitle_map = {
             "imported": "Showing imported nutritional intake data.",
             "local": "Showing local nutritional intake data.",
             "both": "Showing combined imported + local nutritional intake data.",
         }
 
-        # Constructing a clean conditional Vega expression including the source label:
-        expr_parts = [
-            f"selected_metric == '{k}' ? '{source_label} {v} by Fiscal Year'"
-            for k, v in column_label_map.items()
-        ]
-        dynamic_title_expr = (
-            " : ".join(expr_parts)
-            + f" : '{source_label} Nutritional Intake by Fiscal Year'"
-        )
+        # 1. Create figure
+        fig = go.Figure()
 
-        # Combine layers & apply styling with dynamic title expression
-        final_chart = (
-            alt.layer(line, points, selectors)
-            .properties(
-                width="container",
-                height=380,
-                title=alt.TitleParams(
-                    text=alt.expr(dynamic_title_expr),
-                    subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
-                    fontSize=16,
-                    subtitleFontSize=12,
-                    anchor="start",
-                ),
+        # 2. Add traces for each nutrient metric using dropdown visibility flags
+        metrics = list(column_label_map.keys())
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=df_pd["fiscal_year"],
+                    y=df_pd[metric],
+                    mode="lines+markers",
+                    name=metric_label,
+                    line=dict(color="#2980B9", width=2.5, shape="spline"),
+                    marker=dict(size=6, color="#2980B9"),
+                    hovertemplate=(
+                        f"<b>Fiscal Year:</b> %{{x}}<br>"
+                        f"<b>{metric_label}:</b> %{{y:,.2f}}<br>"
+                        "<extra></extra>"
+                    ),
+                    visible=(i == 0),  # Show the first metric by default
+                )
             )
-            .configure_view(strokeWidth=0)
-            .configure_axis(labelFontSize=11, titleFontSize=12)
+
+        # 3. Create dropdown buttons to switch metrics dynamically
+        buttons = []
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
+            visibility = [j == i for j in range(len(metrics))]
+
+            buttons.append(
+                dict(
+                    label=metric_label,
+                    method="update",
+                    args=[
+                        {"visible": visibility},
+                        {
+                            "title": dict(
+                                text=(
+                                    f"<b>{source_label} {metric_label} by Fiscal Year</b><br>"
+                                    f"<sup>{subtitle_map.get(source, '')} Select a metric from the dropdown menu above.</sup>"
+                                ),
+                                font=dict(
+                                    size=16, family="Inter, sans-serif", color="#2C3E50"
+                                ),
+                                x=0.0,
+                                xanchor="left",
+                                y=0.98,
+                                yanchor="top",
+                            ),
+                            "yaxis.title_text": metric_label,
+                        },
+                    ],
+                )
+            )
+
+        default_metric_label = column_label_map[metrics[0]]
+
+        # 4. Configure layout styling matching the reference template
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    active=0,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.18,
+                    yanchor="top",
+                    bgcolor="#FFFFFF",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=buttons,
+                )
+            ],
+            template="plotly_white",
+            title=dict(
+                text=(
+                    f"<b>{source_label} {default_metric_label} by Fiscal Year</b><br>"
+                    f"<sup>{subtitle_map.get(source, '')} Select a metric from the dropdown menu above.</sup>"
+                ),
+                font=dict(size=16, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.0,
+                xanchor="left",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            height=480,
+            margin=dict(l=80, r=40, t=140, b=60),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor="#FFFFFF",  # Solid white background for the hover tooltip box
+                bordercolor="#BDC3C7",  # Matching border color
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+            ),
+            showlegend=False,
         )
 
-        return final_chart
+        # 5. Configure Axes
+        fig.update_xaxes(
+            title_text="Fiscal Year", showgrid=False, tickformat="d", dtick=1
+        )
+
+        fig.update_yaxes(
+            title_text=default_metric_label,
+            showgrid=True,
+            gridcolor="#E5E8E8",
+            zeroline=True,
+            zerolinecolor="#2C3E50",
+            zerolinewidth=1,
+        )
+
+        return fig
 
     def gen_graphs_price_change(self) -> alt.HConcatChart:
         """Generates a side-by-side bar chart showing the largest price changes
@@ -582,124 +609,235 @@ class DataCal(JPTrade):
         Returns:
             alt.HConcatChart: Horizontally concatenated Altair chart.
         """
-        # 1. Fetch ranking data
-        imports_df, exports_df = self.gen_price_rankings()
-
-        path_data = str(resources.files("fsdc_calories").joinpath("data/hts4_walk.parquet"))
-
-        desc_df = pl.read_parquet(path_data).rename({"code_4":"hs4", "Description":"hts_desc"}).to_pandas()
-        desc_df = desc_df.rename({"code_4":"hs4"})
-
-        def process_and_build_chart(df: pd.DataFrame, title_text: str) -> alt.Chart:
-            """Helper to deduplicate top/bottom records, join descriptions, and build chart."""
-            if df.empty:
-                return alt.Chart(pd.DataFrame()).mark_text(text=f"No {title_text} Data")
-
-            # Select Top 10 and Bottom 10 without duplicate overlap if total rows < 20
-            top = df.head(10)
-            bottom = df.tail(10)
-            combined = pd.concat([top, bottom], ignore_index=True).drop_duplicates()
-
-            # Join descriptions on 'hs4'
-            merged = combined.merge(desc_df, on="hs4", how="left")
-            merged["hts_desc"] = merged["hts_desc"].fillna("Unknown Commodity")
-
-            # Add visual helper column for color encoding (positive vs negative change)
-            merged["change_type"] = merged["pct_change"].apply(
-                lambda x: "Increase" if x >= 0 else "Decrease"
-            )
-
-            # Build chart layer
-            chart = (
-                alt.Chart(merged)
-                .mark_bar(cornerRadiusEnd=3)
-                .encode(
-                    x=alt.X(
-                        "pct_change:Q",
-                        title="Price Change",
-                        axis=alt.Axis(format="+.1%", grid=True, gridDash=[2, 2]),
-                    ),
-                    y=alt.Y(
-                        "hts_desc:N",
-                        title=None,
-                        sort=alt.EncodingSortField(
-                            field="pct_change", order="descending"
-                        ),
-                        axis=alt.Axis(labelLimit=200),
-                    ),
-                    color=alt.Color(
-                        "change_type:N",
-                        scale=alt.Scale(
-                            domain=["Increase", "Decrease"],
-                            range=[
-                                "#4daf4a",
-                                "#e41a1c",
-                            ],  # Red for increase, Green for decrease
-                        ),
-                        legend=None,
-                    ),
-                    tooltip=[
-                        alt.Tooltip("hs4:N", title="HS4 Code"),
-                        alt.Tooltip("hts_desc:N", title="Description"),
-                        alt.Tooltip("pct_change:Q", title="Change", format="+.2%"),
-                    ],
-                )
-                .properties(
-                    width=320,
-                    height=350,
-                    title=alt.TitleParams(
-                        text=title_text,
-                        fontSize=14,
-                        anchor="start",
-                    ),
-                )
-            )
-
-            # Add reference zero-line for clear visual separation
-            rule = (
-                alt.Chart(pd.DataFrame({"x": [0]}))
-                .mark_rule(color="#666666", strokeDash=[2, 2])
-                .encode(x="x:Q")
-            )
-
-            return alt.layer(chart, rule)
-
-        # 3. Process both Imports and Exports
-        imports_chart = process_and_build_chart(imports_df, "Imports")
-        exports_chart = process_and_build_chart(exports_df, "Exports")
-
-        # 4. Concatenate side-by-side with shared configurations
-        final_chart = (
-            alt.hconcat(imports_chart, exports_chart)
-            .resolve_scale(y="independent")  # Keep distinct category labels per chart
-            .configure_view(strokeWidth=0)
-            .configure_axis(labelFontSize=10, titleFontSize=11)
+        df = self.process_price(agriculture_filter=True)
+        path_data = str(
+            resources.files("fsdc_calories").joinpath("data/hts4_walk.parquet")
         )
 
-        return final_chart
+        desc_df = pl.read_parquet(path_data).rename(
+            {"code_4": "hs4", "Description": "hts_desc"}
+        )
+        desc_df.with_columns(pl.col("hs4") == "1516")
+
+        df = df.join(desc_df, on="hs4", how="inner", validate="m:1")
+
+        # 1. Filter for the latest date & prepare columns (with word-based truncation)
+        latest_data = (
+            df.filter(pl.col("date") == pl.col("date").max())
+            .with_columns(
+                actual_yoy=pl.col("price_imports_yoy"),
+                plot_yoy=pl.col("price_imports_yoy").clip(-100, 100),
+                # Format the text label (+15.2% or -5.4%)
+                text_label=(
+                    pl.col("price_imports_yoy").round(1).cast(pl.Utf8) + "%"
+                ).str.replace(r"^([0-9])", r"+$1"),
+                # Split by whitespace, take first 4 words, join back, and append "..." if longer
+                short_desc=(
+                    pl.col("hts_desc").str.split(" ").list.head(4).list.join(" ")
+                    + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 4)
+                    .then(pl.lit("..."))
+                    .otherwise(pl.lit(""))
+                ),
+            )
+            .with_columns(
+                # Check for duplicates of short_desc and append a differentiator (e.g., " (2)", " (3)")
+                short_desc=pl.when(
+                    pl.col("short_desc").is_duplicated().over("short_desc")
+                )
+                .then(
+                    pl.col("short_desc")
+                    + " ("
+                    + (pl.cum_count("short_desc").over("short_desc").cast(pl.Utf8))
+                    + ")"
+                )
+                .otherwise(pl.col("short_desc"))
+            )
+        )
+
+        # 2. Extract Top 50 and Bottom 50
+        # Top 50: Sort ascending so the largest positive value is last (at the top of the chart)
+        top_50_data = (
+            latest_data.sort("actual_yoy", descending=True)
+            .head(30)
+            .to_pandas()
+            .iloc[::-1]
+        )
+
+        # Bottom 50: We want the biggest drop (most negative) at the top.
+        # Sorting ascending with .head(50) gives the most negative values first,
+        # so we reverse it (.iloc[::-1]) so the absolute largest drop lands at the very top.
+        bottom_50_data = (
+            latest_data.sort("actual_yoy", descending=False)
+            .head(50)
+            .to_pandas()
+            .iloc[::-1]
+        )
+
+        # 3. Create a single figure (no subplots needed)
+        fig = go.Figure()
+
+        # Enhanced hover template
+        hover_template = (
+            "<b>Description:</b> %{y}<br>"
+            "<b>HS4 Code:</b> %{customdata[0]}<br>"
+            "<b>Price Imports YoY:</b> %{customdata[1]:.1f}%<br>"
+            "<extra></extra>"
+        )
+
+        # 4. Add Top 50 Trace (Index 0 - Shown by default)
+        fig.add_trace(
+            go.Bar(
+                x=top_50_data["plot_yoy"],
+                y=top_50_data["short_desc"],
+                text=top_50_data["text_label"],
+                textposition="outside",
+                orientation="h",
+                customdata=list(zip(top_50_data["hs4"], top_50_data["actual_yoy"])),
+                hovertemplate=hover_template,
+                marker=dict(
+                    color=top_50_data["plot_yoy"],
+                    colorscale="Viridis",
+                    showscale=False,
+                    opacity=0.9,
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                visible=True,
+            )
+        )
+
+        # 5. Add Bottom 50 Trace (Index 1 - Hidden by default)
+        fig.add_trace(
+            go.Bar(
+                x=bottom_50_data["plot_yoy"],
+                y=bottom_50_data["short_desc"],
+                text=bottom_50_data["text_label"],
+                textposition="outside",
+                orientation="h",
+                customdata=list(
+                    zip(bottom_50_data["hs4"], bottom_50_data["actual_yoy"])
+                ),
+                hovertemplate=hover_template,
+                marker=dict(
+                    color=bottom_50_data["plot_yoy"],
+                    colorscale="Viridis_r",
+                    showscale=False,
+                    opacity=0.9,
+                    line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                ),
+                visible=False,
+            )
+        )
+
+        # 6. Configure Tab-Style Buttons (Updatemenus)
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="right",
+                    active=0,
+                    x=0.5,
+                    xanchor="center",
+                    y=1.12,
+                    yanchor="top",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=[
+                        dict(
+                            label="Top 50 Categories (YoY % Increase)",
+                            method="update",
+                            args=[
+                                {"visible": [True, False]},
+                                {
+                                    "xaxis.range": [0, 120],
+                                    "xaxis.title_text": "YoY % Change",
+                                },
+                            ],
+                        ),
+                        dict(
+                            label="Bottom 50 Categories (YoY % Decrease)",
+                            method="update",
+                            args=[
+                                {"visible": [False, True]},
+                                {
+                                    "xaxis.range": [-120, 0],
+                                    "xaxis.title_text": "YoY % Change",
+                                },
+                            ],
+                        ),
+                    ],
+                )
+            ],
+            template="plotly_white",
+            title=dict(
+                text="<b>Import Price Volatility: Extreme YoY Changes</b><br><sup>Switch between top positive and negative HS4 category movements</sup>",
+                font=dict(size=18, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.5,
+                xanchor="center",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            height=1200,
+            margin=dict(l=120, r=100, t=160, b=80),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+
+        # 7. Configure X and Y Axes
+        fig.update_xaxes(
+            title_text="YoY % Change",
+            range=[0, 120],
+            showgrid=True,
+            gridcolor="#E5E8E8",
+            zeroline=True,
+            zerolinecolor="#2C3E50",
+            zerolinewidth=1.5,
+        )
+
+        fig.update_yaxes(showticklabels=True, tickfont=dict(size=9), showgrid=False)
+
+        return fig
 
     def gen_graphs_plate(self):
         df = self.gen_nuti_data()
-        df = df.group_by(["fiscal_year"]).agg(pl.col("total_calories", "protein", "vegetable", "dairy", "fruits", "grains", "ice_cream", "fats", "sugars", "other").sum())
-        df =  df.with_columns(
-            protein=pl.col("protein")/ pl.col("total_calories"),
-            vegetable=pl.col("protein")/ pl.col("total_calories"),
-            dairy=pl.col("dairy")/ pl.col("total_calories"),
-            fruits=pl.col("fruits")/ pl.col("total_calories"),
-            grains=pl.col("grains")/ pl.col("total_calories"),
-            ice_cream=pl.col("ice_cream")/ pl.col("total_calories"),
-            fats=pl.col("fats")/ pl.col("total_calories"),
-            sugars=pl.col("sugars")/ pl.col("total_calories"),
-            other=pl.col("other")/ pl.col("total_calories"),
+        df = df.group_by(["fiscal_year"]).agg(
+            pl.col(
+                "total_calories",
+                "protein",
+                "vegetable",
+                "dairy",
+                "fruits",
+                "grains",
+                "ice_cream",
+                "fats",
+                "sugars",
+                "other",
+            ).sum()
+        )
+        df = df.with_columns(
+            protein=pl.col("protein") / pl.col("total_calories"),
+            vegetable=pl.col("protein") / pl.col("total_calories"),
+            dairy=pl.col("dairy") / pl.col("total_calories"),
+            fruits=pl.col("fruits") / pl.col("total_calories"),
+            grains=pl.col("grains") / pl.col("total_calories"),
+            ice_cream=pl.col("ice_cream") / pl.col("total_calories"),
+            fats=pl.col("fats") / pl.col("total_calories"),
+            sugars=pl.col("sugars") / pl.col("total_calories"),
+            other=pl.col("other") / pl.col("total_calories"),
         )
 
         df = df.with_columns(
-            others=pl.col("other") + pl.col("ice_cream") + pl.col("fats") + pl.col("sugars")
+            others=pl.col("other")
+            + pl.col("ice_cream")
+            + pl.col("fats")
+            + pl.col("sugars")
         ).drop("ice_cream", "fats", "sugars")
 
         # Convert Polars DataFrame to Pandas for Plotly processing
         pdf = df.to_pandas()
-            
+
         # Define categories to plot and clean them up for presentation (Title Case)
         categories = ["protein", "vegetable", "dairy", "fruits", "grains", "other"]
         category_labels = [cat.capitalize() for cat in categories]
@@ -707,7 +845,7 @@ class DataCal(JPTrade):
         # Sort the fiscal years in descending order (inverted sort)
         fiscal_years = sorted(pdf["fiscal_year"].unique().tolist(), reverse=True)
 
-        # Generate a professional, color-blind friendly Viridis color palette mapped to categories
+        # Generate a professional color-blind friendly Viridis color palette mapped to categories
         viridis_colors = px.colors.sample_colorscale("Viridis", len(categories))
 
         fig = go.Figure()
@@ -716,7 +854,7 @@ class DataCal(JPTrade):
         for i, year in enumerate(fiscal_years):
             row = pdf[pdf["fiscal_year"] == year]
             values = [row[cat].values[0] for cat in categories]
-            
+
             fig.add_trace(
                 go.Pie(
                     labels=category_labels,
@@ -728,56 +866,77 @@ class DataCal(JPTrade):
                     hovertemplate="<b>%{label}</b><br>Share: %{percent}<extra></extra>",
                     marker=dict(
                         colors=viridis_colors,
-                        line=dict(color="#FFFFFF", width=2)  # Crisp separation borders
+                        line=dict(color="#FFFFFF", width=2),  # Crisp separation borders
                     ),
-                    # Pull out the largest slice slightly for a modern aesthetic focal point
-                    pull=[0.03 if j == values.index(max(values)) else 0 for j in range(len(values))]
+                    pull=[
+                        0.03 if j == values.index(max(values)) else 0
+                        for j in range(len(values))
+                    ],
                 )
             )
-            
-        # Create robust dropdown buttons
+
+        # Create robust dropdown buttons matching reference style
         buttons = []
         for i, year in enumerate(fiscal_years):
             visibility = [False] * len(fiscal_years)
             visibility[i] = True
-            
+
             buttons.append(
                 dict(
                     label=str(year),
-                    method="restyle",  # Use 'restyle' instead of 'update' for targeted trace visibility switching
+                    method="update",
                     args=[
                         {"visible": visibility},
-                        {"title.text": f"<b>Nutritional Proportion Breakdown — Fiscal Year {year}</b>"}
-                    ]
+                        {
+                            "title": dict(
+                                text=(
+                                    f"<b>Puerto Rico Food Plate Proportion Breakdown — Fiscal Year {year}</b><br>"
+                                    f"<sup>Comparative annual distribution across major food groups from imported data</sup>"
+                                ),
+                                font=dict(
+                                    size=16, family="Inter, sans-serif", color="#2C3E50"
+                                ),
+                                x=0.0,
+                                xanchor="left",
+                                y=0.98,
+                                yanchor="top",
+                            )
+                        },
+                    ],
                 )
             )
-            
-        # Update layout to publication-ready standards
+
+        # Update layout to match reference template styling standards
         fig.update_layout(
             updatemenus=[
                 dict(
+                    type="dropdown",
+                    direction="down",
                     active=0,
-                    buttons=buttons,
                     x=0.0,
                     xanchor="left",
-                    y=1.15,
+                    y=1.18,
                     yanchor="top",
-                    bgcolor="#F8F9FA",
-                    bordercolor="#CED4DA",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
                     borderwidth=1,
-                    pad={"r": 10, "t": 10, "b": 10, "l": 10},
-                    font=dict(family="Arial, sans-serif", size=12, color="#212529")
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=buttons,
                 )
             ],
+            template="plotly_white",
             title=dict(
-                text=f"<b>Puerto Rico Food Pate Proportion Breakdown — Fiscal Year {fiscal_years[0]}</b><br><sup>Comparative annual distribution across major food groups from imported data</sup>",
-                font=dict(family="Arial, sans-serif", size=16, color="#212529"),
-                x=0.0,  # Left-align title for a modern corporate/editorial look
+                text=(
+                    f"<b>Puerto Rico Food Plate Proportion Breakdown — Fiscal Year {fiscal_years[0]}</b><br>"
+                    f"<sup>Comparative annual distribution across major food groups from imported data</sup>"
+                ),
+                font=dict(size=16, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.0,
                 xanchor="left",
-                y=0.95
+                y=0.98,
+                yanchor="top",
             ),
-            template="simple_white",
-            font=dict(family="Arial, sans-serif", size=12, color="#212529"),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
             legend=dict(
                 title=dict(text="<b>Food Categories</b>"),
                 orientation="v",
@@ -786,19 +945,19 @@ class DataCal(JPTrade):
                 xanchor="left",
                 x=1.02,
                 bgcolor="rgba(255,255,255,0.8)",
-                bordercolor="#E9ECEF",
-                borderwidth=1
+                bordercolor="#E5E8E8",
+                borderwidth=1,
+                font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
             ),
-            margin=dict(t=140, b=50, l=50, r=150),
+            height=520,
+            margin=dict(l=40, r=150, t=140, b=40),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
             hoverlabel=dict(
-                bgcolor="white",
-                font_size=12,
-                font_family="Arial, sans-serif"
-            )
+                bgcolor="white", font_size=12, font_family="Inter, sans-serif"
+            ),
         )
 
-        # Enable responsive resizing configuration for web/dashboard embedding
-        #fig.show(config={"responsive": True, "displayModeBar": True})
         return fig
 
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
