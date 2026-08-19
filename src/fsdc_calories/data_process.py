@@ -596,8 +596,8 @@ class DataCal(JPTrade):
                 return alt.Chart(pd.DataFrame()).mark_text(text=f"No {title_text} Data")
 
             # Select Top 10 and Bottom 10 without duplicate overlap if total rows < 20
-            top = df.head(50)
-            bottom = df.tail(50)
+            top = df.head(10)
+            bottom = df.tail(10)
             combined = pd.concat([top, bottom], ignore_index=True).drop_duplicates()
 
             # Join descriptions on 'hs4'
@@ -800,7 +800,6 @@ class DataCal(JPTrade):
         # Enable responsive resizing configuration for web/dashboard embedding
         #fig.show(config={"responsive": True, "displayModeBar": True})
         return fig
-
 
     def gen_graphs_local_dist(self) -> alt.VConcatChart:
         # 1. Load dataframes
