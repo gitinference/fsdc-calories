@@ -660,9 +660,9 @@ identify==2.6.19 \
     --hash=sha256:20e6a87f786f768c092a721ad107fc9df0eb89347be9396cadf3f4abbd1fb78a \
     --hash=sha256:6be5020c38fcb07da56c53733538a3081ea5aa70d36a156f83044bfbf9173842
     # via pre-commit
-idna==3.18 \
-    --hash=sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2 \
-    --hash=sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848
+idna==3.19 \
+    --hash=sha256:5e0811a4383b21dc5838069f801c4fb62113b7447663d2530d2bd6e77b49bf15 \
+    --hash=sha256:815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4
     # via
     #   anyio
     #   httpx
@@ -686,9 +686,9 @@ ipython-pygments-lexers==1.1.1 \
     --hash=sha256:09c0138009e56b6854f9535736f4171d855c8c08a563a0dcd8022f78355c7e81 \
     --hash=sha256:a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c
     # via ipython
-ipywidgets==8.1.8 \
-    --hash=sha256:61f969306b95f85fba6b6986b7fe45d73124d1d9e3023a8068710d47a22ea668 \
-    --hash=sha256:ecaca67aed704a338f88f67b1181b58f821ab5dc89c1f0f5ef99db43c1c2921e
+ipywidgets==8.1.9 \
+    --hash=sha256:bcccba38a6ec3253f7a39c943cea5b9ad01999ce071396171adbc51c6a6a8613 \
+    --hash=sha256:f2b8cbcaae10252b809fbe4d7470db75c09b769a32cbf816d20e5ca6d3c5a79d
     # via
     #   anywidget
     #   jupyter
@@ -709,9 +709,9 @@ jinja2==3.1.6 \
     #   jupyterlab
     #   jupyterlab-server
     #   nbconvert
-jp-imports==1.7.5 \
-    --hash=sha256:15b8b97e2cc01f6977b308bc5ae59a8b7ff52775554fc384ac3400e064f22e20 \
-    --hash=sha256:619b63cf19397f5764bb068783014e877e70501b2c1ef15e4844cfbce3ef22e6
+jp-imports==1.8.0 \
+    --hash=sha256:01604119a5d41bc677651c457e17363eacbb7ba3757a999381132da8decea60d \
+    --hash=sha256:22ba41039c9e82d2e26fd883ab91b26920fa25e04b28e7469b327b5137b966ac
     # via fsdc-calories
 jp-tools==1.0.4 \
     --hash=sha256:43e8c4f9c02801aafe37be7d4c4e20d359e84445fd887c3d817fc287f285e8dd \
@@ -811,9 +811,9 @@ jupyterlab-server==2.28.0 \
     # via
     #   jupyterlab
     #   notebook
-jupyterlab-widgets==3.0.16 \
-    --hash=sha256:423da05071d55cf27a9e602216d35a3a65a3e41cdf9c5d3b643b814ce38c19e0 \
-    --hash=sha256:45fa36d9c6422cf2559198e4db481aa243c7a32d9926b500781c830c80f7ecf8
+jupyterlab-widgets==3.0.17 \
+    --hash=sha256:40ac1e9955acf116c4d995d9bfa082d86ad9ec6d91c4f134827cf5e0a5eb75e0 \
+    --hash=sha256:6e61fe21ca8a66039180a5cc52a433e07279d2fee79c8be963e00d55193f17a8
     # via ipywidgets
 jupytext==1.19.5 \
     --hash=sha256:605026446d605aa54fd7f7fc69df6ae51c7a46053d4cebf05afdc64d66de3df0 \
@@ -1091,6 +1091,7 @@ narwhals==2.24.0 \
     --hash=sha256:b5c0f684ccd9d7475b564111e319a4964abcf2baf79d3cf6b1003d06ac9b828d
     # via
     #   altair
+    #   plotly
     #   vegafusion
 nbclient==0.11.0 \
     --hash=sha256:04a134a5b087f2c5887f228aca155db50169b8cd9334dee6942c8e927e56081a \
@@ -1102,9 +1103,9 @@ nbconvert==7.17.1 \
     # via
     #   jupyter
     #   jupyter-server
-nbformat==5.11.0 \
-    --hash=sha256:7dbaed4a69cae28c2b4d44ab7430a6af4544fb89455023f6f21550be757b60c8 \
-    --hash=sha256:f70a17f591a9ccd1c601d5e61a4b20972703926df0ba42458ce14bf575766bb6
+nbformat==5.11.1 \
+    --hash=sha256:32d4521c68c6e7d5b29c76defaeed9f42ea733142b9b19f88277ce10390b9c4d \
+    --hash=sha256:cc6698fa75f4fab8755ead786317815f13a6fee3b53311c0abb1a8b51d52f7ec
     # via
     #   jupyter-server
     #   jupytext
@@ -1266,6 +1267,7 @@ packaging==26.3 \
     #   kaleido
     #   matplotlib
     #   nbconvert
+    #   plotly
     #   vegafusion
 pandas==3.0.5 \
     --hash=sha256:0d298e951f23016ce4699951d044ae6418dbc91bf68cefca0f77666fcbb4e5c6 \
@@ -1398,6 +1400,10 @@ platformdirs==4.11.3 \
     #   choreographer
     #   jupyter-core
     #   virtualenv
+plotly==6.9.0 \
+    --hash=sha256:36bebe2f1bb13884774fe61689c329071446f6ce4a8927fb1f0d6fb24f581236 \
+    --hash=sha256:967ad33e8c704fed051800d11d985eb206a9c795c14206b30a6f463ed9c67d0d
+    # via fsdc-calories
 pnglatex==1.1 \
     --hash=sha256:0995060d4926b6d3b40731586c615234c3e45b3142fc15b836601e3b0cf863d3 \
     --hash=sha256:8d1d01c59e14ad05ef152194c1bd28f996f0d999b93a67110f24e8be7c0aee20
@@ -1536,9 +1542,9 @@ pycparser==3.0 ; implementation_name != 'PyPy' \
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
     # via cffi
-pygments==2.20.0 \
-    --hash=sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f \
-    --hash=sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176
+pygments==2.21.0 \
+    --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9 \
+    --hash=sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c
     # via
     #   ipython
     #   ipython-pygments-lexers
@@ -1997,9 +2003,9 @@ websocket-client==1.9.0 \
     --hash=sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98 \
     --hash=sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef
     # via jupyter-server
-widgetsnbextension==4.0.15 \
-    --hash=sha256:8156704e4346a571d9ce73b84bee86a29906c9abfd7223b7228a28899ccf3366 \
-    --hash=sha256:de8610639996f1567952d763a5a41af8af37f2575a41f9852a38f947eb82a3b9
+widgetsnbextension==4.0.16 \
+    --hash=sha256:a31a8774885b96fe825462f5d6496166f0c7cae111195b6465c801d230eb5a4e \
+    --hash=sha256:adeea0ae78f0856ee4945f413299801b82a0a01416303301f39a704282a37b73
     # via ipywidgets
 xyzservices==2026.3.0 \
     --hash=sha256:503183d4b322bfebc3c50cdd21192aa3e81e36c5efbf9133d54ae82143e0576b \

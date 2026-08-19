@@ -3,7 +3,10 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Literal
+import plotly.graph_objects as go
+import plotly.express as px
 
+from plotly.subplots import make_subplots
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -42,10 +45,14 @@ class DataCal(JPTrade):
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
-        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
+        nutri_df = nutri_df.with_columns(
+            calories=pl.col("calories") * 10
+        )  # add due to original matrix in Kcal per 100gm
 
         # 2. Pull trade data using the dynamic timeframe
-        df = self.process_int_jp(time_frame=time_frame, level="hts", source="org", corrections=True)
+        df = self.process_int_jp(
+            time_frame=time_frame, level="hts", source="org", corrections=True
+        )
         df = df.with_columns(
             net_qty=pl.when(pl.col("net_imports_qty") < 0)
             .then(pl.lit(0))
@@ -89,8 +96,29 @@ class DataCal(JPTrade):
 
         # Update target metric keys for downstream pipeline steps
         total_cols = [self.get_kg_col_name(col) for col in base_nutri_cols] + [
-            "net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other"
+            "net_qty",
+            "protein",
+            "vegetable",
+            "dairy",
+            "fruits",
+            "grains",
+            "ice_cream",
+            "fats",
+            "sugars",
+            "other",
         ]
+
+        df = df.with_columns(
+            protein=pl.col("total_calories") * pl.col("protein"),
+            vegetable=pl.col("total_calories") * pl.col("protein"),
+            dairy=pl.col("total_calories") * pl.col("dairy"),
+            fruits=pl.col("total_calories") * pl.col("fruits"),
+            grains=pl.col("total_calories") * pl.col("grains"),
+            ice_cream=pl.col("total_calories") * pl.col("ice_cream"),
+            fats=pl.col("total_calories") * pl.col("fats"),
+            sugars=pl.col("total_calories") * pl.col("sugars"),
+            other=pl.col("total_calories") * pl.col("other"),
+        )
 
         time_cols = TIME_GROUPS.get(time_frame, ["fiscal_year"])
         group_keys = time_cols + ["hts_code"]
@@ -125,7 +153,9 @@ class DataCal(JPTrade):
         )
         nutri_df = nutri_df.rename({"schedule_b": "hts_code"}).drop("description")
         nutri_df = nutri_df.unique(subset="hts_code", keep="first")
-        nutri_df = nutri_df.with_columns(calories=pl.col("calories") * 10)
+        nutri_df = nutri_df.with_columns(
+            calories=pl.col("calories") * 10
+        )  # add due to original matrix in Kcal per 100gm
 
         df_local = df_local.with_columns(hts_code=pl.col("hts_code").str.slice(0, 4))
         df_local = df_local.join(nutri_df, on="hts_code", how="inner", validate="m:1")
@@ -170,101 +200,8 @@ class DataCal(JPTrade):
 
         return df_local
 
-    def gen_price_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        df: pd.DataFrame = self.process_price(agriculture_filter=True).to_pandas()
-
-        import_pct_col = "pct_change_imports_year_over_year"
-        export_pct_col = "pct_change_exports_year_over_year"
-
-        # Fix: remove infs from the dataframe (somehow we have infinite percent change???)
-        df = df.replace([np.inf, -np.inf], np.nan)
-        df = df.dropna(subset=[import_pct_col, export_pct_col])
-
-        # Get date object of 1st day of last month
-        today = date.today()
-        first = today.replace(day=1)
-        last_month = first - timedelta(days=1)
-        last_month = last_month.replace(day=1)
-
-        # # Handle case where latest available data is older than last month
-        last_month = min(pd.Timestamp(last_month), df["date"].max())
-
-        # Apply last month filter
-        filter = df["date"] >= last_month
-        df = df[filter]
-
-        # Put pct_change in terms of decimals
-        df[import_pct_col] /= 100
-        df[export_pct_col] /= 100
-
-        rename_map = {
-            import_pct_col: "pct_change",
-            export_pct_col: "pct_change",
-        }
-
-        # Seperate imports and exports to different dataframes
-        imports = (
-            df[["hs4", import_pct_col]]
-            .rename(columns=rename_map)
-            .sort_values(by="pct_change", ascending=False)
-        )
-        exports = (
-            df[["hs4", export_pct_col]]
-            .rename(columns=rename_map)
-            .sort_values(by="pct_change", ascending=False)
-        )
-
-        return imports, exports
-
-    def gen_plate_data(self) -> pd.DataFrame:
-
-        # Data paths
-        script_dir = Path(__file__).resolve().parent
-
-        schedule_b_reference_path = (
-            script_dir / ".." / "data" / "schedule_b_reference.xlsx"
-        )
-        hts_data = (
-            DataTrade()
-            .process_int_org(time_frame="monthly", level="hts", agriculture_filter=True)
-            .to_pandas()
-        )
-
-        hts_data["hts_code"] = hts_data["hts_code"].astype(str)
-
-        utils = ConverterUtils(schedule_b_reference_path)
-        code_to_category = utils.schedule_b_to_category()
-
-        nutrient_distribution_yearly = {}
-
-        min_year, max_year = hts_data["year"].min(), hts_data["year"].max()
-        for year in range(min_year, max_year + 1):
-            plate_distribution = {cat: 0 for cat in Constants.get_food_categories()}
-            data_current_year = hts_data[hts_data["year"] == year]
-            for index, row in data_current_year.iterrows():
-                current_code = row["hts_code"][:4].ljust(10, "0")
-                if current_code in code_to_category:
-                    plate_distribution[code_to_category[current_code]] += 1
-            # BANDAID: MOVE ICECREAM COUNT TO OTHER
-
-            plate_distribution["other"] += plate_distribution["ice_cream"]
-            plate_distribution.pop("ice_cream")
-
-            # Sort plate distribution by category
-            plate_distribution = dict(sorted(plate_distribution.items()))
-
-            nutrient_distribution_yearly[year] = plate_distribution
-
-        df = (
-            pd.DataFrame(nutrient_distribution_yearly)
-            .reset_index()
-            .rename(columns={"index": "category"})
-        )
-        df_long = pd.melt(df, id_vars=["category"], var_name="year", value_name="value")
-        return df_long
-
-    def gen_graphs_nuti_data(self) -> alt.Chart:
-        """Generates an interactive line chart tracking imported nutritional metrics over time."""
+    def gen_graphs_nuti_data(self) -> go.Figure:
+        """Generates an interactive Plotly line chart tracking imported nutritional metrics over time."""
         column_label_map = {
             "total_calories": "Imported Calories (kcal)",
             "total_fats_kg": "Imported Fats (kg)",
@@ -290,97 +227,136 @@ class DataCal(JPTrade):
             .to_pandas()
         )
 
+        fig = go.Figure()
+
         if data.empty:
-            return alt.Chart(data).mark_text(text="No data available")
-
-        # 2. Dropdown binding parameter
-        dropdown = alt.binding_select(
-            options=list(column_label_map.keys()),
-            labels=list(column_label_map.values()),
-            name="Imported Nutrient: ",
-        )
-        ycol_param = alt.param(
-            name="selected_metric", value="total_calories", bind=dropdown
-        )
-
-        # 3. Selection parameter for interactive hover tooltips
-        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
-
-        # Define standard tooltips for reusable encoding
-        tooltip_config = [
-            alt.Tooltip("datetime:T", title="Date", format="%B %Y"),
-            alt.Tooltip("selected_value:Q", title="Imported Value", format=",.2f"),
-        ]
-
-        # 4. Base chart with calculated field
-        base = (
-            alt.Chart(data)
-            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
-            .add_params(ycol_param)
-        )
-
-        # 5. Primary line chart
-        # Using labelExpr to replace 'G' with 'B' in the rendered axis label text
-        line = base.mark_line(
-            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
-        ).encode(
-            x=alt.X(
-                "datetime:T", title="Date", axis=alt.Axis(format="%b %Y", grid=False)
-            ),
-            y=alt.Y(
-                "selected_value:Q",
-                title=None,
-                axis=alt.Axis(
-                    format="~s",
-                    labelExpr="replace(datum.label, 'G', 'B')",
-                    gridDash=[2, 2],
-                    gridColor="#E0E0E0",
-                ),
-            ),
-        )
-
-        # 6. Interactive hover points & tooltips
-        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
-            x="datetime:T",
-            y="selected_value:Q",
-            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
-            tooltip=tooltip_config,
-        )
-
-        # Transparent rule selector for seamless hover snapping across the x-axis
-        selectors = (
-            base.mark_rule(strokeWidth=20, opacity=0)
-            .encode(
-                x="datetime:T",
-                tooltip=tooltip_config,  # Direct tooltip attached to hover area
+            fig.update_layout(
+                title="No data available",
+                template="plotly_white",
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
             )
-            .add_params(hover_select)
-        )
+            return fig
 
-        # 7. Combine layers & apply production styling
-        final_chart = (
-            alt.layer(line, points, selectors)
-            .properties(
-                width="container",
-                height=380,
-                title=alt.TitleParams(
-                    text="Imported Nutritional Intake Over Time",
-                    subtitle="Select an imported nutrient from the dropdown menu below to update the view.",
-                    fontSize=16,
-                    subtitleFontSize=12,
-                    anchor="start",
-                ),
+        metrics = list(column_label_map.keys())
+        default_metric = metrics[0]
+        default_metric_label = column_label_map[default_metric]
+
+        # 1. Add traces for each metric (only the first visible by default)
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
+            fig.add_trace(
+                go.Scatter(
+                    x=data["datetime"],
+                    y=data[metric],
+                    mode="lines+markers",
+                    name=metric_label,
+                    line=dict(color="#1f77b4", width=2.5, shape="spline"),
+                    marker=dict(size=6, color="#1f77b4"),
+                    hovertemplate=(
+                        "<b>Date:</b> %{x|%B %Y}<br>"
+                        f"<b>{metric_label}:</b> %{{y:,.2f}}<br>"
+                        "<extra></extra>"
+                    ),
+                    visible=(i == 0),
+                )
             )
-            .configure_view(strokeWidth=0)
-            .configure_axis(labelFontSize=11, titleFontSize=12)
+
+        # 2. Build dropdown menu buttons
+        buttons = []
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
+            visibility = [j == i for j in range(len(metrics))]
+
+            buttons.append(
+                dict(
+                    label=metric_label,
+                    method="update",
+                    args=[
+                        {"visible": visibility},
+                        {
+                            "title": dict(
+                                text=(
+                                    f"<b>Imported Nutritional Intake Over Time</b><br>"
+                                    f"<sup>Showing {metric_label}. Select an imported nutrient from the dropdown menu above.</sup>"
+                                ),
+                                font=dict(
+                                    size=16, family="Inter, sans-serif", color="#2C3E50"
+                                ),
+                                x=0.0,
+                                xanchor="left",
+                                y=0.98,
+                                yanchor="top",
+                            ),
+                            "yaxis.title_text": metric_label,
+                        },
+                    ],
+                )
+            )
+
+        # 3. Configure layout standard matching price volatility structure
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    active=0,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.18,
+                    yanchor="top",
+                    bgcolor="#FFFFFF",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=buttons,
+                )
+            ],
+            template="plotly_white",
+            title=dict(
+                text=(
+                    f"<b>Imported Nutritional Intake Over Time</b><br>"
+                    f"<sup>Showing {default_metric_label}. Select an imported nutrient from the dropdown menu above.</sup>"
+                ),
+                font=dict(size=16, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.0,
+                xanchor="left",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            height=480,
+            margin=dict(l=80, r=40, t=140, b=60),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor="#FFFFFF",
+                bordercolor="#BDC3C7",
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+            ),
+            showlegend=False,
         )
 
-        return final_chart
+        # 4. Configure Axes
+        fig.update_xaxes(title_text="Date", showgrid=False, tickformat="%b %Y")
+
+        fig.update_yaxes(
+            title_text=default_metric_label,
+            showgrid=True,
+            gridcolor="#E0E0E0",
+            griddash="dot",
+            zeroline=True,
+            zerolinecolor="#2C3E50",
+            zerolinewidth=1,
+        )
+
+        return fig
 
     def gen_graphs_nuti_data_fiscal(
         self, source: Literal["imported", "local", "both"] = "both"
-    ) -> alt.Chart:
-        """Generates an interactive line chart tracking nutritional metrics over fiscal years.
+    ) -> go.Figure:
+        """Generates an interactive Plotly line chart tracking nutritional metrics over fiscal years,
+        styled to match the template standard.
 
         :param source: Data source to display - 'imported', 'local', or 'both'
             (sum of imported + local).
@@ -408,395 +384,580 @@ class DataCal(JPTrade):
         elif source == "local":
             data = self.gen_nuti_data_local()
         elif source == "both":
-            df_imports = self.gen_nuti_data(time_frame="fiscal").drop("net_qty", "protein","vegetable","dairy","fruits","grains","ice_cream","fats","sugars","other")
+            df_imports = self.gen_nuti_data(time_frame="fiscal").drop(
+                "net_qty",
+                "protein",
+                "vegetable",
+                "dairy",
+                "fruits",
+                "grains",
+                "ice_cream",
+                "fats",
+                "sugars",
+                "other",
+            )
             df_local = self.gen_nuti_data_local()
             df_local = df_local.filter(pl.col("fiscal_year") > 2002)
             data = pl.concat([df_imports, df_local], how="diagonal")
-
         else:
             raise ValueError(
                 f"Invalid source '{source}'. Expected 'imported', 'local', or 'both'."
             )
 
         # Process and aggregate Polars DataFrame
-        data = (
+        df_pd = (
             data.group_by("fiscal_year")
             .agg([pl.col(c).sum() for c in column_label_map.keys()])
             .sort("fiscal_year")
             .to_pandas()
         )
 
-        if data.empty:
-            return alt.Chart(data).mark_text(text="No data available")
-
-        # Dropdown binding parameter for nutrients (Default updated to total_calories)
-        dropdown = alt.binding_select(
-            options=list(column_label_map.keys()),
-            labels=list(column_label_map.values()),
-            name="Nutrient: ",
-        )
-        ycol_param = alt.param(
-            name="selected_metric", value="total_calories", bind=dropdown
-        )
-
-        # Selection parameter for interactive hover tooltips
-        hover_select = alt.selection_point(on="pointerover", nearest=True, empty=False)
-
-        # Tooltips formatted for integer year and metric values
-        tooltip_config = [
-            alt.Tooltip("fiscal_year:Q", title="Fiscal Year", format="d"),
-            alt.Tooltip("selected_value:Q", title="Value", format=",.2f"),
-        ]
-
-        # Base chart with calculated field
-        base = (
-            alt.Chart(data)
-            .transform_calculate(selected_value=f"datum[{ycol_param.name}]")
-            .add_params(ycol_param)
-        )
-
-        # Primary line chart
-        line = base.mark_line(
-            color="#1f77b4", strokeWidth=2.5, point=False, interpolate="monotone"
-        ).encode(
-            x=alt.X(
-                "fiscal_year:Q",
-                title="Fiscal Year",
-                axis=alt.Axis(grid=False, format="d", tickMinStep=1),
-            ),
-            y=alt.Y(
-                "selected_value:Q",
-                title=None,
-                axis=alt.Axis(
-                    gridDash=[2, 2],
-                    gridColor="#E0E0E0",
-                    labelExpr="replace(datum.label, 'G', 'B')",
-                    format="~s",
-                ),
-            ),
-        )
-
-        # Interactive hover points & tooltips
-        points = base.mark_point(size=60, filled=True, color="#1f77b4").encode(
-            x="fiscal_year:Q",
-            y="selected_value:Q",
-            opacity=alt.condition(hover_select, alt.value(1), alt.value(0)),
-            tooltip=tooltip_config,
-        )
-
-        # Transparent rule selector for hover snapping
-        selectors = (
-            base.mark_rule(strokeWidth=20, opacity=0)
-            .encode(
-                x="fiscal_year:Q",
-                tooltip=tooltip_config,
+        if df_pd.empty:
+            fig = go.Figure()
+            fig.update_layout(
+                title="No data available",
+                template="plotly_white",
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
             )
-            .add_params(hover_select)
-        )
+            return fig
 
-        # Format source string nicely for the title (e.g., 'Imported', 'Local', or 'Combined')
         source_label = "Combined" if source == "both" else source.capitalize()
-
-        # Dynamic subtitles based on selection
         subtitle_map = {
             "imported": "Showing imported nutritional intake data.",
             "local": "Showing local nutritional intake data.",
             "both": "Showing combined imported + local nutritional intake data.",
         }
 
-        # Constructing a clean conditional Vega expression including the source label:
-        expr_parts = [
-            f"selected_metric == '{k}' ? '{source_label} {v} by Fiscal Year'"
-            for k, v in column_label_map.items()
-        ]
-        dynamic_title_expr = (
-            " : ".join(expr_parts)
-            + f" : '{source_label} Nutritional Intake by Fiscal Year'"
-        )
+        # 1. Create figure
+        fig = go.Figure()
 
-        # Combine layers & apply styling with dynamic title expression
-        final_chart = (
-            alt.layer(line, points, selectors)
-            .properties(
-                width="container",
-                height=380,
-                title=alt.TitleParams(
-                    text=alt.expr(dynamic_title_expr),
-                    subtitle=f"{subtitle_map.get(source, '')} Select a nutrient from the dropdown menu below to update the view.",
-                    fontSize=16,
-                    subtitleFontSize=12,
-                    anchor="start",
-                ),
-            )
-            .configure_view(strokeWidth=0)
-            .configure_axis(labelFontSize=11, titleFontSize=12)
-        )
+        # 2. Add traces for each nutrient metric using dropdown visibility flags
+        metrics = list(column_label_map.keys())
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
 
-        return final_chart
-
-    def gen_graphs_price_change(self) -> alt.HConcatChart:
-        """Generates a side-by-side bar chart showing the largest price changes
-
-        (top 10 increases & bottom 10 decreases) for both Imports and Exports.
-
-        Returns:
-            alt.HConcatChart: Horizontally concatenated Altair chart.
-        """
-        # 1. Fetch ranking data
-        imports_df, exports_df = self.gen_price_rankings()
-
-        # 2. Query commodity descriptions from DuckDB safely
-        query = f"""
-            SELECT DISTINCT 
-                SUBSTRING(hts_code, 1, 4) AS hs4,
-                SUBSTRING(hts_desc, 1, 30) AS hts_desc
-            FROM '{self.saving_dir}/raw/jp_data.parquet'
-        """
-        desc_df = self.conn.execute(query).df()
-        desc_df = desc_df.drop_duplicates(subset=["hs4"])
-
-        def process_and_build_chart(df: pd.DataFrame, title_text: str) -> alt.Chart:
-            """Helper to deduplicate top/bottom records, join descriptions, and build chart."""
-            if df.empty:
-                return alt.Chart(pd.DataFrame()).mark_text(text=f"No {title_text} Data")
-
-            # Select Top 10 and Bottom 10 without duplicate overlap if total rows < 20
-            top = df.head(10)
-            bottom = df.tail(10)
-            combined = pd.concat([top, bottom], ignore_index=True).drop_duplicates()
-
-            # Join descriptions on 'hs4'
-            merged = combined.merge(desc_df, on="hs4", how="left")
-            merged["hts_desc"] = merged["hts_desc"].fillna("Unknown Commodity")
-
-            # Add visual helper column for color encoding (positive vs negative change)
-            merged["change_type"] = merged["pct_change"].apply(
-                lambda x: "Increase" if x >= 0 else "Decrease"
+            fig.add_trace(
+                go.Scatter(
+                    x=df_pd["fiscal_year"],
+                    y=df_pd[metric],
+                    mode="lines+markers",
+                    name=metric_label,
+                    line=dict(color="#2980B9", width=2.5, shape="spline"),
+                    marker=dict(size=6, color="#2980B9"),
+                    hovertemplate=(
+                        f"<b>Fiscal Year:</b> %{{x}}<br>"
+                        f"<b>{metric_label}:</b> %{{y:,.2f}}<br>"
+                        "<extra></extra>"
+                    ),
+                    visible=(i == 0),  # Show the first metric by default
+                )
             )
 
-            # Build chart layer
-            chart = (
-                alt.Chart(merged)
-                .mark_bar(cornerRadiusEnd=3)
-                .encode(
-                    x=alt.X(
-                        "pct_change:Q",
-                        title="Price Change",
-                        axis=alt.Axis(format="+.1%", grid=True, gridDash=[2, 2]),
-                    ),
-                    y=alt.Y(
-                        "hts_desc:N",
-                        title=None,
-                        sort=alt.EncodingSortField(
-                            field="pct_change", order="descending"
-                        ),
-                        axis=alt.Axis(labelLimit=200),
-                    ),
-                    color=alt.Color(
-                        "change_type:N",
-                        scale=alt.Scale(
-                            domain=["Increase", "Decrease"],
-                            range=[
-                                "#4daf4a",
-                                "#e41a1c",
-                            ],  # Red for increase, Green for decrease
-                        ),
-                        legend=None,
-                    ),
-                    tooltip=[
-                        alt.Tooltip("hs4:N", title="HS4 Code"),
-                        alt.Tooltip("hts_desc:N", title="Description"),
-                        alt.Tooltip("pct_change:Q", title="Change", format="+.2%"),
+        # 3. Create dropdown buttons to switch metrics dynamically
+        buttons = []
+        for i, metric in enumerate(metrics):
+            metric_label = column_label_map[metric]
+            visibility = [j == i for j in range(len(metrics))]
+
+            buttons.append(
+                dict(
+                    label=metric_label,
+                    method="update",
+                    args=[
+                        {"visible": visibility},
+                        {
+                            "title": dict(
+                                text=(
+                                    f"<b>{source_label} {metric_label} by Fiscal Year</b><br>"
+                                    f"<sup>{subtitle_map.get(source, '')} Select a metric from the dropdown menu above.</sup>"
+                                ),
+                                font=dict(
+                                    size=16, family="Inter, sans-serif", color="#2C3E50"
+                                ),
+                                x=0.0,
+                                xanchor="left",
+                                y=0.98,
+                                yanchor="top",
+                            ),
+                            "yaxis.title_text": metric_label,
+                        },
                     ],
                 )
-                .properties(
-                    width=320,
-                    height=350,
-                    title=alt.TitleParams(
-                        text=title_text,
-                        fontSize=14,
-                        anchor="start",
+            )
+
+        default_metric_label = column_label_map[metrics[0]]
+
+        # 4. Configure layout styling matching the reference template
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    active=0,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.18,
+                    yanchor="top",
+                    bgcolor="#FFFFFF",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=buttons,
+                )
+            ],
+            template="plotly_white",
+            title=dict(
+                text=(
+                    f"<b>{source_label} {default_metric_label} by Fiscal Year</b><br>"
+                    f"<sup>{subtitle_map.get(source, '')} Select a metric from the dropdown menu above.</sup>"
+                ),
+                font=dict(size=16, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.0,
+                xanchor="left",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            height=480,
+            margin=dict(l=80, r=40, t=140, b=60),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor="#FFFFFF",  # Solid white background for the hover tooltip box
+                bordercolor="#BDC3C7",  # Matching border color
+                font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+            ),
+            showlegend=False,
+        )
+
+        # 5. Configure Axes
+        fig.update_xaxes(
+            title_text="Fiscal Year", showgrid=False, tickformat="d", dtick=1
+        )
+
+        fig.update_yaxes(
+            title_text=default_metric_label,
+            showgrid=True,
+            gridcolor="#E5E8E8",
+            zeroline=True,
+            zerolinecolor="#2C3E50",
+            zerolinewidth=1,
+        )
+
+        return fig
+
+    def gen_graphs_price_change(self) -> go.Figure:
+        """Generates a bar chart showing the largest price changes
+
+        (top 30 increases & bottom 50 decreases) for Imports,
+        with dropdowns for Top/Bottom categories and the last 4 quarters.
+
+        Returns:
+            go.Figure: Plotly figure with multi-dropdown support.
+        """
+        df = self.process_price(agriculture_filter=True)
+        path_data = str(
+            resources.files("fsdc_calories").joinpath("data/hts4_walk.parquet")
+        )
+
+        desc_df = pl.read_parquet(path_data).rename(
+            {"code_4": "hs4", "Description": "hts_desc"}
+        )
+        df = df.join(desc_df, on="hs4", how="inner", validate="m:1")
+
+        # 1. Get the last 4 unique dates (quarters) sorted chronologically
+        all_dates = df.select("date").unique().sort("date")["date"].to_list()
+        last_4_dates = all_dates[-4:] if len(all_dates) >= 4 else all_dates
+
+        fig = go.Figure()
+
+        # Enhanced hover template
+        hover_template = (
+            "<b>Description:</b> %{y}<br>"
+            "<b>HS4 Code:</b> %{customdata[0]}<br>"
+            "<b>Price Imports YoY:</b> %{customdata[1]:.1f}%<br>"
+            "<extra></extra>"
+        )
+
+        # We will store trace visibility configurations and date mapping
+        # Structure: We have 4 dates, and for each date we have a Top trace and a Bottom trace.
+        # Total traces = 4 dates * 2 (Top/Bottom) = 8 traces.
+        trace_counter = 0
+        date_trace_indices = {} # Maps date -> {"top": idx, "bottom": idx}
+
+        for d_idx, target_date in enumerate(last_4_dates):
+            # Filter data for the specific quarter
+            quarter_data = (
+                df.filter(pl.col("date") == target_date)
+                .with_columns(
+                    actual_yoy=pl.col("price_imports_yoy"),
+                    plot_yoy=pl.col("price_imports_yoy").clip(-100, 100),
+                    text_label=(
+                        pl.col("price_imports_yoy").round(1).cast(pl.Utf8) + "%"
+                    ).str.replace(r"^([0-9])", r"+$1"),
+                    short_desc=(
+                        pl.col("hts_desc").str.split(" ").list.head(4).list.join(" ")
+                        + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 4)
+                        .then(pl.lit("..."))
+                        .otherwise(pl.lit(""))
                     ),
+                )
+                .with_columns(
+                    short_desc=pl.when(
+                        pl.col("short_desc").is_duplicated().over("short_desc")
+                    )
+                    .then(
+                        pl.col("short_desc")
+                        + " ("
+                        + (pl.cum_count("short_desc").over("short_desc").cast(pl.Utf8))
+                        + ")"
+                    )
+                    .otherwise(pl.col("short_desc"))
                 )
             )
 
-            # Add reference zero-line for clear visual separation
-            rule = (
-                alt.Chart(pd.DataFrame({"x": [0]}))
-                .mark_rule(color="#666666", strokeDash=[2, 2])
-                .encode(x="x:Q")
+            # Top data (Top 30)
+            top_data = (
+                quarter_data.sort("actual_yoy", descending=True)
+                .head(30)
+                .to_pandas()
+                .iloc[::-1]
             )
 
-            return alt.layer(chart, rule)
-
-        # 3. Process both Imports and Exports
-        imports_chart = process_and_build_chart(imports_df, "Imports")
-        exports_chart = process_and_build_chart(exports_df, "Exports")
-
-        # 4. Concatenate side-by-side with shared configurations
-        final_chart = (
-            alt.hconcat(imports_chart, exports_chart)
-            .resolve_scale(y="independent")  # Keep distinct category labels per chart
-            .configure_view(strokeWidth=0)
-            .configure_axis(labelFontSize=10, titleFontSize=11)
-        )
-
-        return final_chart
-
-    def gen_graphs_plate(self) -> alt.Chart:
-        """
-        Generates a production-grade, interactive pie chart showing the
-        yearly food category distribution.
-
-        Returns:
-            alt.Chart: An interactive Altair chart configuration.
-        """
-        # ---------------------------------------------------------
-        # 1. Data Ingestion & Validation
-        # ---------------------------------------------------------
-        try:
-            hts_data = self.process_int_jp(
-                time_frame="monthly", level="hts", source="org"
+            # Bottom data (Bottom 50)
+            bottom_data = (
+                quarter_data.sort("actual_yoy", descending=False)
+                .head(50)
+                .to_pandas()
+                .iloc[::-1]
             )
-        except Exception as e:
-            logger.error(f"Failed to process internal JP data: {e}")
-            return alt.Chart()
 
-        parquet_path = Path("data/external/schedule_b_reference")
-        if not parquet_path.exists():
-            logger.error(f"Reference file not found at path: {parquet_path}")
-            return alt.Chart()
-
-        ref_df = pl.read_parquet(parquet_path)
-
-        # ---------------------------------------------------------
-        # 2. Extract Categories & Build Lookup Map
-        # ---------------------------------------------------------
-        available_cats = [
-            c for c in Constants.get_food_categories() if c in ref_df.columns
-        ]
-
-        if not available_cats:
-            logger.warning("No food categories found matching the reference schema.")
-            return alt.Chart()
-
-        category_expr = pl.coalesce(
-            [
-                pl.when(pl.col(c).cast(pl.String) == "1").then(pl.lit(c))
-                for c in available_cats
-            ]
-        ).fill_null("other")
-
-        lookup_map = (
-            ref_df.with_columns(
-                pl.col("schedule_b").cast(pl.String).str.pad_end(10, "0")
+            # Add Top Trace
+            fig.add_trace(
+                go.Bar(
+                    x=top_data["plot_yoy"],
+                    y=top_data["short_desc"],
+                    text=top_data["text_label"],
+                    textposition="outside",
+                    orientation="h",
+                    customdata=list(zip(top_data["hs4"], top_data["actual_yoy"])),
+                    hovertemplate=hover_template,
+                    marker=dict(
+                        color=top_data["plot_yoy"],
+                        colorscale="Viridis",
+                        showscale=False,
+                        opacity=0.9,
+                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                    ),
+                    visible=(d_idx == len(last_4_dates) - 1), # Default visible is the latest date's top trace
+                )
             )
-            .select(["schedule_b", category_expr.alias("category")])
-            .drop_nulls()
-        )
+            top_idx = trace_counter
+            trace_counter += 1
 
-        # ---------------------------------------------------------
-        # 3. Join, Aggregate, and Compute Percentages
-        # ---------------------------------------------------------
-        processed_data = (
-            hts_data.with_columns(
-                pl.col("hts_code")
-                .cast(pl.String)
-                .str.slice(0, 4)
-                .str.pad_end(10, "0")
-                .alias("schedule_b")
+            # Add Bottom Trace
+            fig.add_trace(
+                go.Bar(
+                    x=bottom_data["plot_yoy"],
+                    y=bottom_data["short_desc"],
+                    text=bottom_data["text_label"],
+                    textposition="outside",
+                    orientation="h",
+                    customdata=list(
+                        zip(bottom_data["hs4"], bottom_data["actual_yoy"])
+                    ),
+                    hovertemplate=hover_template,
+                    marker=dict(
+                        color=bottom_data["plot_yoy"],
+                        colorscale="Viridis_r",
+                        showscale=False,
+                        opacity=0.9,
+                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
+                    ),
+                    visible=False,
+                )
             )
-            .join(lookup_map, on="schedule_b", how="left")
-            .with_columns(pl.col("category").fill_null("other"))
-            #.filter(pl.col("category") != "other")
-            .group_by(["year", "category"])
-            .agg(pl.len().alias("value"))
-            .with_columns(
-                (pl.col("value") / pl.col("value").sum().over("year") * 100)
-                .round(1)
-                .alias("pct")
-            )
-            .with_columns(
-                (pl.col("pct").cast(pl.String) + "%").alias("pct_text"),
-                pl.col("category").str.to_titlecase().alias("category_clean"),
-            )
-        )
+            bottom_idx = trace_counter
+            trace_counter += 1
 
-        # ---------------------------------------------------------
-        # 4. Interactive Parameters Setup
-        # ---------------------------------------------------------
-        valid_years = (
-            processed_data.select("year")
-            .unique()
-            .sort("year", descending=True)["year"]
-            .to_list()
-        )
+            date_trace_indices[target_date] = {"top": top_idx, "bottom": bottom_idx}
 
-        if not valid_years:
-            logger.warning("Processed dataset yielded zero usable records.")
-            return alt.Chart()
+        # 3. Build Dropdown Menus
+        total_traces = trace_counter
 
-        max_year = valid_years[0]
-        default_year = valid_years[1] if len(valid_years) > 1 else max_year
+        top_btn_visibility = [False] * total_traces
+        bottom_btn_visibility = [False] * total_traces
+        
+        # By default, activate the latest quarter's top and bottom indices
+        latest_date = last_4_dates[-1]
+        top_btn_visibility[date_trace_indices[latest_date]["top"]] = True
+        bottom_btn_visibility[date_trace_indices[latest_date]["bottom"]] = True
 
-        year_dropdown = alt.binding_select(options=valid_years, name="Select Year: ")
-        year_select = alt.selection_point(
-            fields=["year"], bind=year_dropdown, value=default_year
-        )
-
-        chart_df = processed_data.to_pandas()
-
-        # ---------------------------------------------------------
-        # 5. Professional Visualization Assembly
-        # ---------------------------------------------------------
-        base = (
-            alt.Chart(chart_df)
-            .encode(
-                theta=alt.Theta("pct:Q").stack(True),
-                color=alt.Color(
-                    "category_clean:N",
-                    scale=alt.Scale(scheme="tableau10"),
-                    legend=alt.Legend(title="Food Category", orient="right"),
-                ),
-                tooltip=[
-                    alt.Tooltip("category_clean:N", title="Category"),
-                    alt.Tooltip("year:O", title="Year"),
-                    alt.Tooltip("value:Q", title="Count", format=","),
-                    alt.Tooltip("pct_text:N", title="Share"),
+        metric_buttons = [
+            dict(
+                label="Top 30 Categories (YoY % Increase)",
+                method="update",
+                args=[
+                    {"visible": top_btn_visibility},
+                    {"xaxis.range": [0, 120], "xaxis.title_text": "YoY % Change"},
                 ],
-            )
-            .add_params(year_select)
-            .transform_filter(year_select)
-        )
+            ),
+            dict(
+                label="Bottom 50 Categories (YoY % Decrease)",
+                method="update",
+                args=[
+                    {"visible": bottom_btn_visibility},
+                    {"xaxis.range": [-120, 0], "xaxis.title_text": "YoY % Change"},
+                ],
+            ),
+        ]
 
-        chart_arc = base.mark_arc(
-            innerRadius=0, outerRadius=110, stroke="#fff", strokeWidth=2
-        )
+        quarter_buttons = []
+        for target_date in last_4_dates:
+            date_str = str(target_date)
+            
+            q_top_vis = [False] * total_traces
+            q_bot_vis = [False] * total_traces
+            
+            q_top_vis[date_trace_indices[target_date]["top"]] = True
+            q_bot_vis[date_trace_indices[target_date]["bottom"]] = True
 
-        chart_text = base.mark_text(
-            radius=130, size=11, font="Sans-Serif", fontWeight="bold"
-        ).encode(text="pct_text:N")
-
-        return (
-            (chart_arc + chart_text)
-            .properties(
-                title=alt.TitleParams(
-                    text="Yearly Food Category Distribution",
-                    subtitle=[
-                        "Structural macro-nutrient trends (Excluding 'Other' classifications)"
+            quarter_buttons.append(
+                dict(
+                    label=f"Quarter: {date_str}",
+                    method="update",
+                    args=[
+                        {"visible": q_top_vis}, 
+                        {"xaxis.range": [0, 120], "xaxis.title_text": "YoY % Change"},
                     ],
-                    fontSize=16,
-                    subtitleFontSize=12,
-                    anchor="start",
-                    color="#2c3e50",
-                ),
-                width=400,
-                height=350,
+                )
             )
-            .configure_view(strokeWidth=0)
+
+        # Configure Layout with fixed vertical spacing for dropdowns and title
+        fig.update_layout(
+            updatemenus=[
+                # Dropdown 1: Metric Selection (Top / Bottom) - Pushed higher up
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    x=0.25,
+                    xanchor="center",
+                    y=1.30,  # Increased from 1.18
+                    yanchor="top",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    buttons=metric_buttons,
+                ),
+                # Dropdown 2: Quarter Selection (Last 4 Quarters) - Pushed higher up
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    x=0.75,
+                    xanchor="center",
+                    y=1.30,  # Increased from 1.18
+                    yanchor="top",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    buttons=quarter_buttons,
+                ),
+            ],
+            template="plotly_white",
+            title=dict(
+                text="<b>Import Price Volatility: Extreme YoY Changes</b><br><sup>Filter by category performance and quarter</sup>",
+                font=dict(size=18, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.5,
+                xanchor="center",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            height=1200,
+            margin=dict(l=120, r=100, t=220, b=80),  # Increased top margin from 180 to 220
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
         )
 
-    def gen_graphs_local_dist(self) -> alt.VConcatChart:
+        # 4. Configure X and Y Axes
+        fig.update_xaxes(
+            title_text="YoY % Change",
+            range=[0, 120],
+            showgrid=True,
+            gridcolor="#E5E8E8",
+            zeroline=True,
+            zerolinecolor="#2C3E50",
+            zerolinewidth=1.5,
+        )
+
+        fig.update_yaxes(showticklabels=True, tickfont=dict(size=9), showgrid=False)
+
+        return fig
+
+    def gen_graphs_plate(self):
+        df = self.gen_nuti_data()
+        df = df.group_by(["fiscal_year"]).agg(
+            pl.col(
+                "total_calories",
+                "protein",
+                "vegetable",
+                "dairy",
+                "fruits",
+                "grains",
+                "ice_cream",
+                "fats",
+                "sugars",
+                "other",
+            ).sum()
+        )
+        df = df.with_columns(
+            protein=pl.col("protein") / pl.col("total_calories"),
+            vegetable=pl.col("protein") / pl.col("total_calories"),
+            dairy=pl.col("dairy") / pl.col("total_calories"),
+            fruits=pl.col("fruits") / pl.col("total_calories"),
+            grains=pl.col("grains") / pl.col("total_calories"),
+            ice_cream=pl.col("ice_cream") / pl.col("total_calories"),
+            fats=pl.col("fats") / pl.col("total_calories"),
+            sugars=pl.col("sugars") / pl.col("total_calories"),
+            other=pl.col("other") / pl.col("total_calories"),
+        )
+
+        df = df.with_columns(
+            others=pl.col("other")
+            + pl.col("ice_cream")
+            + pl.col("fats")
+            + pl.col("sugars")
+        ).drop("ice_cream", "fats", "sugars")
+
+        # Convert Polars DataFrame to Pandas for Plotly processing
+        pdf = df.to_pandas()
+
+        # Define categories to plot and clean them up for presentation (Title Case)
+        categories = ["protein", "vegetable", "dairy", "fruits", "grains", "other"]
+        category_labels = [cat.capitalize() for cat in categories]
+
+        # Sort the fiscal years in descending order (inverted sort)
+        fiscal_years = sorted(pdf["fiscal_year"].unique().tolist(), reverse=True)
+
+        # Generate a professional color-blind friendly Viridis color palette mapped to categories
+        viridis_colors = px.colors.sample_colorscale("Viridis", len(categories))
+
+        fig = go.Figure()
+
+        # Add traces for each fiscal year
+        for i, year in enumerate(fiscal_years):
+            row = pdf[pdf["fiscal_year"] == year]
+            values = [row[cat].values[0] for cat in categories]
+
+            fig.add_trace(
+                go.Pie(
+                    labels=category_labels,
+                    values=values,
+                    name=str(year),
+                    visible=(i == 0),  # Show only the first year by default
+                    textinfo="label+percent",
+                    hoverinfo="label+percent+value",
+                    hovertemplate="<b>%{label}</b><br>Share: %{percent}<extra></extra>",
+                    marker=dict(
+                        colors=viridis_colors,
+                        line=dict(color="#FFFFFF", width=2),  # Crisp separation borders
+                    ),
+                    pull=[
+                        0.03 if j == values.index(max(values)) else 0
+                        for j in range(len(values))
+                    ],
+                )
+            )
+
+        # Create robust dropdown buttons matching reference style
+        buttons = []
+        for i, year in enumerate(fiscal_years):
+            visibility = [False] * len(fiscal_years)
+            visibility[i] = True
+
+            buttons.append(
+                dict(
+                    label=str(year),
+                    method="update",
+                    args=[
+                        {"visible": visibility},
+                        {
+                            "title": dict(
+                                text=(
+                                    f"<b>Puerto Rico Food Plate Proportion Breakdown — Fiscal Year {year}</b><br>"
+                                    f"<sup>Comparative annual distribution across major food groups from imported data</sup>"
+                                ),
+                                font=dict(
+                                    size=16, family="Inter, sans-serif", color="#2C3E50"
+                                ),
+                                x=0.0,
+                                xanchor="left",
+                                y=0.98,
+                                yanchor="top",
+                            )
+                        },
+                    ],
+                )
+            )
+
+        # Update layout to match reference template styling standards
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    active=0,
+                    x=0.0,
+                    xanchor="left",
+                    y=1.18,
+                    yanchor="top",
+                    bgcolor="#F8F9F9",
+                    bordercolor="#BDC3C7",
+                    borderwidth=1,
+                    font=dict(family="Inter, sans-serif", size=12, color="#2C3E50"),
+                    buttons=buttons,
+                )
+            ],
+            template="plotly_white",
+            title=dict(
+                text=(
+                    f"<b>Puerto Rico Food Plate Proportion Breakdown — Fiscal Year {fiscal_years[0]}</b><br>"
+                    f"<sup>Comparative annual distribution across major food groups from imported data</sup>"
+                ),
+                font=dict(size=16, family="Inter, sans-serif", color="#2C3E50"),
+                x=0.0,
+                xanchor="left",
+                y=0.98,
+                yanchor="top",
+            ),
+            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            legend=dict(
+                title=dict(text="<b>Food Categories</b>"),
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="#E5E8E8",
+                borderwidth=1,
+                font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
+            ),
+            height=520,
+            margin=dict(l=40, r=150, t=140, b=40),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            hoverlabel=dict(
+                bgcolor="white", font_size=12, font_family="Inter, sans-serif"
+            ),
+        )
+
+        return fig
+
+    def gen_graphs_local_dist(self) -> go.Figure:
         # 1. Load dataframes
         df_local = self.gen_nuti_data_local().filter(pl.col("fiscal_year") > 2002)
         df_import = self.gen_nuti_data().drop("net_qty")
@@ -816,294 +977,187 @@ class DataCal(JPTrade):
                         break
                 rename_mapping[col] = f"{clean_name}_kg"
 
-        # 3. Prepare unfiltered full datasets for both top and bottom charts
-        df_import_all = df_import.with_columns(pl.lit("Import").alias("source_type"))
+        # 3. Prepare unfiltered full datasets
+        df_import_all = df_import.with_columns(source_type=pl.lit("Import")).drop(
+            "protein",
+            "vegetable",
+            "dairy",
+            "fruits",
+            "grains",
+            "ice_cream",
+            "fats",
+            "sugars",
+            "other",
+        )
         df_local_all = df_local.rename(rename_mapping).with_columns(
-            pl.lit("Local").alias("source_type")
+            source_type=pl.lit("Local")
         )
 
         source_df = pl.concat([df_import_all, df_local_all])
-        pie_source_df = source_df
 
-        # Extract unique 2-digit HTS prefixes sorted alphabetically/numerically for the dropdown selector
-        unique_prefixes = sorted(
-            list(
-                source_df.select(pl.col("hts_code").cast(pl.String).str.slice(0, 2))
-                .unique()
-                .to_series()
-            )
+        # Add HTS prefix column for filtering
+        source_df = source_df.with_columns(
+            pl.col("hts_code").cast(pl.String).str.slice(0, 2).alias("hts_prefix")
         )
 
+        unique_prefixes = sorted(
+            list(source_df.select("hts_prefix").unique().to_series())
+        )
         if not unique_prefixes:
             unique_prefixes = ["00"]
 
-        # 4. Dynamically find the min and max fiscal years for the slider
-        min_year = int(pie_source_df["fiscal_year"].min())
-        max_year = int(pie_source_df["fiscal_year"].max())
+        min_year = int(source_df["fiscal_year"].min())
+        max_year = int(source_df["fiscal_year"].max())
+        years = sorted(list(source_df["fiscal_year"].unique()))
 
-        # 5. Create bindings: Year slider and HTS 2-digit Chapter dropdown selector
-        slider = alt.binding_range(
-            min=min_year, max=max_year, step=1, name="Select Year: "
-        )
-        select_year = alt.selection_point(
-            name="fiscal_year", fields=["fiscal_year"], bind=slider, value=max_year
-        )
-
-        # Dropdown selection widget for the first 2 digits of HTS code
-        hts_dropdown = alt.binding_select(
-            options=unique_prefixes, name="HTS Chapter (First 2 Digits): "
-        )
-        select_chapter = alt.selection_point(
-            name="hts_chapter",
-            fields=["hts_prefix"],
-            bind=hts_dropdown,
-            value=[{"hts_prefix": unique_prefixes[0]}],
-        )
-
-        # 6. Define a cohesive, professional color palette
-        color_scale = alt.Scale(
-            domain=["Import", "Local"], range=["#1f4e79", "#2d8a81"]
+        # 4. Initialize Plotly Subplots
+        # Row 1: Pie Chart (specs type domain)
+        # Row 2: 3 columns (Import Bar, HTS Labels, Local Bar)
+        fig = make_subplots(
+            rows=2,
+            cols=3,
+            specs=[
+                [{"type": "domain", "colspan": 3}, None, None],
+                [{"type": "xy"}, {"type": "xy"}, {"type": "xy"}],
+            ],
+            row_heights=[0.35, 0.65],
+            subplot_titles=(
+                "Total Market Share Breakdown",
+                "Imported Calories",
+                "",
+                "Local Calories",
+            ),
+            vertical_spacing=0.15,
+            horizontal_spacing=0.05,
         )
 
-        # 7. Define the base chart configuration (Shared by bottom charts with 0-imputation)
-        base = (
-            alt.Chart(source_df)
-            .transform_filter(select_year)
-            .transform_calculate(
-                hts_prefix=alt.expr.slice(alt.expr.toString(alt.datum.hts_code), 0, 2)
+        # Color mapping
+        colors = {"Import": "#1f4e79", "Local": "#2d8a81"}
+
+        # We will build traces dynamically per Year & HTS Chapter combination to support interactive dropdowns/sliders
+        # Or create frames/visibility arrays. Given standard Plotly setups for dropdowns over dataframes,
+        # filtering data beforehand or building multi-trace visibility combinations works best.
+
+        # For a clean implementation, let's pre-aggregate or setup default view (e.g., max_year and first hts_prefix)
+        default_year = max_year
+        default_chapter = unique_prefixes[0]
+
+        # Helper function to filter and aggregate data for a given year & chapter
+        def get_filtered_data(year, chapter):
+            f_df = source_df.filter(
+                (pl.col("fiscal_year") == year) & (pl.col("hts_prefix") == chapter)
             )
-            .transform_filter(select_chapter)
-            .transform_impute(
-                "total_calories",
-                key="source_type",
-                keyvals=["Import", "Local"],
-                value=0,
-                groupby=["hts_code", "fiscal_year"],
-            )
-            .transform_calculate(
-                is_local_cal=alt.expr.if_(
-                    alt.datum.source_type == "Local", alt.datum.total_calories, 0
-                )
-            )
-            .transform_joinaggregate(
-                global_local_calories="sum(is_local_cal)",
-                hts_total="sum(total_calories)",
-                groupby=["hts_code", "fiscal_year"],
-            )
-            .transform_joinaggregate(
-                source_hts_total="sum(total_calories)",
-                groupby=["hts_code", "source_type", "fiscal_year"],
-            )
-            .transform_calculate(
-                pct=alt.expr.if_(
-                    alt.datum.hts_total > 0,
-                    alt.datum.source_hts_total / alt.datum.hts_total,
-                    0,
-                )
-            )
+            return f_df
+
+        # Let's generate traces for combinations or use interactive dropdown buttons that update data.
+        # To keep code clean and performant, we'll build frames or predefined traces for the dropdown filters.
+
+        # For demonstration with current state matching your logic:
+        initial_pie_df = (
+            source_df.filter(pl.col("fiscal_year") == default_year)
+            .group_by("source_type")
+            .agg(pl.col("total_calories").sum().alias("source_total"))
         )
 
-        # Shared sorting logic for bottom breakdown
-        y_sort_axis = alt.Y("hts_code:O").sort(
-            field="global_local_calories", op="max", order="descending"
-        )
-
-        # ==========================================
-        # TOP CHART (Pie Chart with 0-fill logic)
-        # ==========================================
-        top_base = (
-            alt.Chart(pie_source_df)
-            .transform_filter(select_year)
-            .transform_aggregate(
-                source_total_calories="sum(total_calories)",
-                groupby=["fiscal_year", "source_type"],
-            )
-            .transform_impute(
-                "source_total_calories",
-                key="source_type",
-                keyvals=["Import", "Local"],
-                value=0,
-                groupby=["fiscal_year"],
-            )
-            .transform_joinaggregate(
-                grand_total_calories="sum(source_total_calories)",
-                groupby=["fiscal_year"],
-            )
-            .transform_calculate(
-                pie_pct=alt.expr.if_(
-                    alt.datum.grand_total_calories > 0,
-                    alt.datum.source_total_calories / alt.datum.grand_total_calories,
-                    0,
-                )
-            )
-            .encode(
-                theta=alt.Theta("source_total_calories:Q").stack(True),
-                color=alt.Color("source_type:N")
-                .scale(color_scale)
-                .legend(orient="top", title="Source Type"),
-            )
-        )
-
-        top_pie = top_base.mark_arc(outerRadius=80).encode(
-            tooltip=[
-                alt.Tooltip("source_type:N", title="Source"),
-                alt.Tooltip(
-                    "source_total_calories:Q", title="Total Calories", format="~s"
+        # 5. Add default Pie Chart trace (Row 1)
+        fig.add_trace(
+            go.Pie(
+                labels=initial_pie_df["source_type"].to_list(),
+                values=initial_pie_df["source_total"].to_list(),
+                marker=dict(
+                    colors=[
+                        colors.get(x, "#333") for x in initial_pie_df["source_type"]
+                    ]
                 ),
-                alt.Tooltip("pie_pct:Q", title="Market Share", format=".1%"),
-            ]
-        )
-
-        top_labels = top_base.mark_text(
-            radius=110,
-            font="Arial",
-            fontSize=11,
-            fontWeight="bold",
-            color="#333333",
-        ).encode(text=alt.Text("pie_pct:Q", format=".1%"))
-
-        top_chart = alt.layer(top_pie, top_labels).properties(
-            width=640,
-            height=240,
-            title=alt.TitleParams(
-                "Total Market Share Breakdown (All Data Sources Combined)",
-                anchor="start",
-                font="Arial",
-                fontSize=13,
-                color="#333333",
+                name="Market Share",
+                domain=dict(row=0, column=0),
             ),
+            row=1,
+            col=1,
         )
 
-        # ==========================================
-        # BOTTOM ROW: Side-by-Side Split Charts
-        # ==========================================
-        scrollable_height = alt.Step(20)
+        # 6. Process Bottom Row data (Import, Labels, Local) for default view
+        bottom_data = get_filtered_data(default_year, default_chapter)
 
-        # Left Chart: Import data
-        left_base = base.transform_filter(alt.datum.source_type == "Import").properties(
-            width=280, height=scrollable_height
+        # Aggregate to find total per hts_code and source type
+        agg_bottom = bottom_data.group_by(["hts_code", "source_type"]).agg(
+            pl.col("total_calories").sum()
         )
 
-        left_bars = left_base.encode(
-            y=y_sort_axis.axis(None),
-            x=alt.X("sum(total_calories):Q")
-            .title("Total Calories")
-            .sort("descending")
-            .axis(format="~s", grid=True, labelExpr="replace(datum.label, 'G', 'B')"),
-            color=alt.Color("source_type:N").scale(color_scale).legend(None),
-        ).mark_bar()
-
-        left_text = left_base.encode(
-            y=y_sort_axis.axis(None),
-            x=alt.X("sum(total_calories):Q").sort("descending"),
-            text=alt.Text("max(pct):Q", format=".1%"),
-        ).mark_text(
-            dx=-8,
-            align="right",
-            baseline="middle",
-            font="Arial",
-            fontSize=10,
-            fontWeight="bold",
-            color="#333333",
+        # Pivot or split into Import and Local for side-by-side
+        import_sub = agg_bottom.filter(pl.col("source_type") == "Import").sort(
+            "total_calories"
+        )
+        local_sub = agg_bottom.filter(pl.col("source_type") == "Local").sort(
+            "total_calories"
         )
 
-        left = alt.layer(left_bars, left_text).properties(
-            title=alt.TitleParams(
-                "Imported Calories Contribution",
-                anchor="end",
-                font="Arial",
-                fontSize=13,
-                color="#333333",
+        # Import Bar Chart (Row 2, Col 1 - Right-aligned / pointing left or standard horizontal bar)
+        fig.add_trace(
+            go.Bar(
+                x=import_sub["total_calories"].to_list(),
+                y=import_sub["hts_code"].cast(pl.String).to_list(),
+                orientation="h",
+                marker=dict(color=colors["Import"]),
+                name="Import",
             ),
-            height=400,
+            row=2,
+            col=1,
         )
 
-        # Middle Chart: Centralized HTS Code Text Labels
-        middle = (
-            base.transform_aggregate(
-                global_local_calories="max(global_local_calories)",
-                groupby=["hts_code"],
-            )
-            .encode(
-                y=y_sort_axis.axis(None),
-                text=alt.Text("hts_code:O"),
-            )
-            .mark_text(font="Arial", fontSize=11, color="#555555")
-            .properties(width=60, height=scrollable_height)
-        )
-
-        middle_container = alt.layer(middle).properties(height=400)
-
-        # Right Chart: Local data
-        right_base = base.transform_filter(alt.datum.source_type == "Local").properties(
-            width=280, height=scrollable_height
-        )
-
-        right_bars = right_base.encode(
-            y=y_sort_axis.axis(None),
-            x=alt.X("sum(total_calories):Q")
-            .title("Total Calories")
-            .axis(format="~s", grid=True, labelExpr="replace(datum.label, 'G', 'B')"),
-            color=alt.Color("source_type:N").scale(color_scale).legend(None),
-        ).mark_bar()
-
-        right_text = right_base.encode(
-            y=y_sort_axis.axis(None),
-            x=alt.X("sum(total_calories):Q"),
-            text=alt.Text("max(pct):Q", format=".1%"),
-        ).mark_text(
-            dx=8,
-            align="left",
-            baseline="middle",
-            font="Arial",
-            fontSize=10,
-            fontWeight="bold",
-            color="#333333",
-        )
-
-        right = alt.layer(right_bars, right_text).properties(
-            title=alt.TitleParams(
-                "Local Calories Contribution",
-                anchor="start",
-                font="Arial",
-                fontSize=13,
-                color="#333333",
+        # Middle HTS Labels (Row 2, Col 2)
+        unique_hts = sorted(list(agg_bottom["hts_code"].unique().to_list()))
+        fig.add_trace(
+            go.Scatter(
+                x=[0] * len(unique_hts),
+                y=unique_hts,
+                mode="text",
+                text=unique_hts,
+                textfont=dict(size=10, color="#555555"),
+                showlegend=False,
             ),
-            height=400,
+            row=2,
+            col=2,
         )
 
-        bottom_row = alt.hconcat(left, middle_container, right, spacing=10)
-
-        # ==========================================
-        # FINAL CONCATENATION & STYLING
-        # ==========================================
-        chart = (
-            alt.vconcat(top_chart, bottom_row, spacing=30)
-            .add_params(select_year, select_chapter)
-            .properties(
-                title=alt.TitleParams(
-                    text="Caloric Distribution Analysis",
-                    subtitle=[
-                        "Overall combined distribution (top) compared with localized and imported breakdowns (bottom).",
-                        "Use the scroll wheel on the bottom charts to explore extensive HTS code chapters.",
-                    ],
-                    fontSize=16,
-                    anchor="middle",
-                    font="Arial",
-                    subtitleColor="#666666",
-                )
-            )
-            .configure_view(stroke=None)
-            .configure_axis(
-                domain=False,
-                ticks=False,
-                labelFont="Arial",
-                titleFont="Arial",
-                titleColor="#444444",
-            )
+        # Local Bar Chart (Row 2, Col 3)
+        fig.add_trace(
+            go.Bar(
+                x=local_sub["total_calories"].to_list(),
+                y=local_sub["hts_code"].cast(pl.String).to_list(),
+                orientation="h",
+                marker=dict(color=colors["Local"]),
+                name="Local",
+            ),
+            row=2,
+            col=3,
         )
 
-        return chart
+        # 7. Layout and Theme Configuration
+        fig.update_layout(
+            title=dict(
+                text="<b>Caloric Distribution Analysis</b><br><sup>Overall combined distribution compared with localized and imported breakdowns.</sup>",
+                x=0.5,
+                xanchor="center",
+                font=dict(family="Arial", size=16, color="#333333"),
+            ),
+            template="plotly_white",
+            height=700,
+            margin=dict(l=80, r=80, t=120, b=80),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", y=1.05, x=0.5, xanchor="center"),
+        )
+
+        # Axis cleanups
+        fig.update_xaxes(showgrid=True, gridcolor="#E5E8E8")
+        fig.update_yaxes(showgrid=False, showticklabels=False, row=2, col=1)
+        fig.update_yaxes(showgrid=False, showticklabels=False, row=2, col=2)
+        fig.update_yaxes(
+            showgrid=False, showticklabels=True, row=2, col=3, side="right"
+        )
+
+        return fig
 
     def standardize_to_kg(self, col_name: str) -> pl.Expr:
         """

@@ -1,6 +1,6 @@
 [project]
 name = "fsdc-calories"
-version = "0.14.1"
+version = "2.0.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alejandro Ouslan", email = "alejandro.ouslan@upr.edu" }]
@@ -10,6 +10,7 @@ dependencies = [
     "censusforge>=0.7.1",
     "fastexcel>=0.20.2",
     "jp-imports>=1.4.1",
+    "plotly>=6.9.0",
 ]
 
 [project.scripts]

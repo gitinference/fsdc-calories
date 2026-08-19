@@ -1,3 +1,12 @@
+## [1.0.0] - 2026-08-19
+
+### 🐛 Bug Fixes
+
+- *(data_process.py)* Correct typo in vitamin_d_kg variable name
+
+### 🚜 Refactor
+
+- *(data_process.py)* Update data processing functions to use Plotly for charts and improve code readability
 ## [0.14.1] - 2026-08-12
 
 ### 🚜 Refactor
@@ -27,7 +36,7 @@
 ### 🐛 Bug Fixes
 
 - *(data_process.py)* Correct agriculture filter parameter in process_price method to False
-## [0.10.1] - 2026-07-15
+## [0.10.0] - 2026-07-15
 
 ### 🐛 Bug Fixes
 
