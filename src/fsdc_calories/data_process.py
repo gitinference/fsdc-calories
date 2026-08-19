@@ -425,7 +425,7 @@ class DataCal(JPTrade):
             "total_carbohydrate_kg": "Carbohydrates (kg)",
             "total_fiber_kg": "Fibers (kg)",
             "total_sugar_kg": "Sugars (kg)",
-            "total_vimport plotly.graph_objects as goitamin_d_kg": "Vitamin D (kg)",
+            "total_vitamin_d_kg": "Vitamin D (kg)",
             "total_calcium_kg": "Calcium (kg)",
             "total_potassium_kg": "Potassium (kg)",
             "total_iron_kg": "Iron (kg)",
