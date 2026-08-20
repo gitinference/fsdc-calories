@@ -580,14 +580,11 @@ class DataCal(JPTrade):
             "<extra></extra>"
         )
 
-        # We will store trace visibility configurations and date mapping
-        # Structure: We have 4 dates, and for each date we have a Top trace and a Bottom trace.
-        # Total traces = 4 dates * 2 (Top/Bottom) = 8 traces.
         trace_counter = 0
-        date_trace_indices = {} # Maps date -> {"top": idx, "bottom": idx}
+        date_trace_indices = {} 
 
         for d_idx, target_date in enumerate(last_4_dates):
-            # Filter data for the specific quarter
+            # Filter data and shorten descriptions further for mobile screens (3 words max)
             quarter_data = (
                 df.filter(pl.col("date") == target_date)
                 .with_columns(
@@ -597,8 +594,8 @@ class DataCal(JPTrade):
                         pl.col("price_imports_yoy").round(1).cast(pl.Utf8) + "%"
                     ).str.replace(r"^([0-9])", r"+$1"),
                     short_desc=(
-                        pl.col("hts_desc").str.split(" ").list.head(4).list.join(" ")
-                        + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 4)
+                        pl.col("hts_desc").str.split(" ").list.head(3).list.join(" ")
+                        + pl.when(pl.col("hts_desc").str.split(" ").list.len() > 3)
                         .then(pl.lit("..."))
                         .otherwise(pl.lit(""))
                     ),
@@ -617,15 +614,13 @@ class DataCal(JPTrade):
                 )
             )
 
-            # Top data (Top 30)
             top_data = (
                 quarter_data.sort("actual_yoy", descending=True)
-                .head(30)
+                .head(50)
                 .to_pandas()
                 .iloc[::-1]
             )
 
-            # Bottom data (Bottom 50)
             bottom_data = (
                 quarter_data.sort("actual_yoy", descending=False)
                 .head(50)
@@ -633,7 +628,7 @@ class DataCal(JPTrade):
                 .iloc[::-1]
             )
 
-            # Add Top Trace
+            # Top Trace
             fig.add_trace(
                 go.Bar(
                     x=top_data["plot_yoy"],
@@ -648,15 +643,14 @@ class DataCal(JPTrade):
                         colorscale="Viridis",
                         showscale=False,
                         opacity=0.9,
-                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
                     ),
-                    visible=(d_idx == len(last_4_dates) - 1), # Default visible is the latest date's top trace
+                    visible=(d_idx == len(last_4_dates) - 1), 
                 )
             )
             top_idx = trace_counter
             trace_counter += 1
 
-            # Add Bottom Trace
+            # Bottom Trace
             fig.add_trace(
                 go.Bar(
                     x=bottom_data["plot_yoy"],
@@ -664,16 +658,13 @@ class DataCal(JPTrade):
                     text=bottom_data["text_label"],
                     textposition="outside",
                     orientation="h",
-                    customdata=list(
-                        zip(bottom_data["hs4"], bottom_data["actual_yoy"])
-                    ),
+                    customdata=list(zip(bottom_data["hs4"], bottom_data["actual_yoy"])),
                     hovertemplate=hover_template,
                     marker=dict(
                         color=bottom_data["plot_yoy"],
                         colorscale="Viridis_r",
                         showscale=False,
                         opacity=0.9,
-                        line=dict(color="rgba(0,0,0,0.1)", width=0.5),
                     ),
                     visible=False,
                 )
@@ -683,20 +674,17 @@ class DataCal(JPTrade):
 
             date_trace_indices[target_date] = {"top": top_idx, "bottom": bottom_idx}
 
-        # 3. Build Dropdown Menus
         total_traces = trace_counter
-
         top_btn_visibility = [False] * total_traces
         bottom_btn_visibility = [False] * total_traces
-        
-        # By default, activate the latest quarter's top and bottom indices
+
         latest_date = last_4_dates[-1]
         top_btn_visibility[date_trace_indices[latest_date]["top"]] = True
         bottom_btn_visibility[date_trace_indices[latest_date]["bottom"]] = True
 
         metric_buttons = [
             dict(
-                label="Top 30 Categories (YoY % Increase)",
+                label="Top 50 Categories",
                 method="update",
                 args=[
                     {"visible": top_btn_visibility},
@@ -704,7 +692,7 @@ class DataCal(JPTrade):
                 ],
             ),
             dict(
-                label="Bottom 50 Categories (YoY % Decrease)",
+                label="Bottom 50 Categories",
                 method="update",
                 args=[
                     {"visible": bottom_btn_visibility},
@@ -716,7 +704,6 @@ class DataCal(JPTrade):
         quarter_buttons = []
         for target_date in last_4_dates:
             date_str = str(target_date)
-            
             q_top_vis = [False] * total_traces
             q_bot_vis = [False] * total_traces
             
@@ -734,55 +721,54 @@ class DataCal(JPTrade):
                 )
             )
 
-        # Configure Layout with fixed vertical spacing for dropdowns and title
+        # Mobile-Optimized Layout Settings
         fig.update_layout(
             updatemenus=[
-                # Dropdown 1: Metric Selection (Top / Bottom) - Pushed higher up
+                # Dropdown 1: Stacked cleanly at the top-left
                 dict(
                     type="dropdown",
                     direction="down",
-                    x=0.25,
-                    xanchor="center",
-                    y=1.30,  # Increased from 1.18
+                    x=0.0,
+                    xanchor="left",
+                    y=1.35,
                     yanchor="top",
                     bgcolor="#F8F9F9",
                     bordercolor="#BDC3C7",
                     borderwidth=1,
-                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    font=dict(size=10, color="#2C3E50"),
                     buttons=metric_buttons,
                 ),
-                # Dropdown 2: Quarter Selection (Last 4 Quarters) - Pushed higher up
+                # Dropdown 2: Stacked directly below the first dropdown for mobile viewports
                 dict(
                     type="dropdown",
                     direction="down",
-                    x=0.75,
-                    xanchor="center",
-                    y=1.30,  # Increased from 1.18
+                    x=0.0,
+                    xanchor="left",
+                    y=1.20,
                     yanchor="top",
                     bgcolor="#F8F9F9",
                     bordercolor="#BDC3C7",
                     borderwidth=1,
-                    font=dict(family="Inter, sans-serif", size=11, color="#2C3E50"),
+                    font=dict(size=10, color="#2C3E50"),
                     buttons=quarter_buttons,
                 ),
             ],
             template="plotly_white",
             title=dict(
-                text="<b>Import Price Volatility: Extreme YoY Changes</b><br><sup>Filter by category performance and quarter</sup>",
-                font=dict(size=18, family="Inter, sans-serif", color="#2C3E50"),
+                text="<b>Import Price Volatility</b><br><sup>YoY Changes by Category</sup>",
+                font=dict(size=14, color="#2C3E50"),
                 x=0.5,
                 xanchor="center",
                 y=0.98,
                 yanchor="top",
             ),
-            font=dict(family="Inter, sans-serif", size=11, color="#34495E"),
-            height=1200,
-            margin=dict(l=120, r=100, t=220, b=80),  # Increased top margin from 180 to 220
+            font=dict(size=10, color="#34495E"),
+            height=850,  # Reduced height to fit smaller screens better
+            margin=dict(l=100, r=50, t=240, b=50), # Adjusted margins for mobile constraints
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
         )
 
-        # 4. Configure X and Y Axes
         fig.update_xaxes(
             title_text="YoY % Change",
             range=[0, 120],
@@ -790,12 +776,9 @@ class DataCal(JPTrade):
             gridcolor="#E5E8E8",
             zeroline=True,
             zerolinecolor="#2C3E50",
-            zerolinewidth=1.5,
         )
 
-        fig.update_yaxes(showticklabels=True, tickfont=dict(size=9), showgrid=False)
-
-        return fig
+        fig.update_yaxes(showticklabels=True, tickfont=dict(size=8), showgrid=False)
 
     def gen_graphs_plate(self):
         df = self.gen_nuti_data()
