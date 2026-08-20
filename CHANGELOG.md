@@ -1,4 +1,4 @@
-## [1.0.0] - 2026-08-19
+## [2.0.0] - 2026-08-19
 
 ### 🐛 Bug Fixes
 
@@ -36,7 +36,7 @@
 ### 🐛 Bug Fixes
 
 - *(data_process.py)* Correct agriculture filter parameter in process_price method to False
-## [0.10.0] - 2026-07-15
+## [0.10.1] - 2026-07-15
 
 ### 🐛 Bug Fixes
 
