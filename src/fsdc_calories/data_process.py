@@ -780,6 +780,8 @@ class DataCal(JPTrade):
 
         fig.update_yaxes(showticklabels=True, tickfont=dict(size=8), showgrid=False)
 
+        return fig
+
     def gen_graphs_plate(self):
         df = self.gen_nuti_data()
         df = df.group_by(["fiscal_year"]).agg(
